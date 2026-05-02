@@ -2044,7 +2044,7 @@ function renderPhaseCopy(paused, upright) {
     statusRibbonEl.textContent = `On board to ${destination.name}`;
     messageEl.textContent = usesUprightCheck
       ? `Keep the phone upright until ${destination.name}.`
-      : `Ride it out standing until ${destination.name}.`;
+      : "Ride it out standing until a seat becomes available.";
     return;
   }
 
