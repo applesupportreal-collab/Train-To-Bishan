@@ -875,6 +875,10 @@ button {
   box-shadow: 0 0 0 4px rgba(240, 195, 68, 0.22), 0 12px 22px rgba(22, 128, 96, 0.26);
 }
 
+.action-button[data-action="rush"].seat-ready::after {
+  background: linear-gradient(90deg, #137457, #24a77b);
+}
+
 .action-button[data-action="sleep"] {
   border-color: #f7f3eb;
   background: linear-gradient(180deg, #1f2933, #0d1116);
