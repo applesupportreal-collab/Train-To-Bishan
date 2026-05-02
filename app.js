@@ -60,6 +60,10 @@ const DEFAULT_GAME_SETTINGS = {
     src: "sounds/yay.ogg",
     volume: 1,
   },
+  auntieSound: {
+    src: "sounds/auntie.ogg",
+    volume: 1,
+  },
   doorClosingSound: {
     src: "sounds/doors_are_closing.ogg",
     volume: 1,
@@ -114,6 +118,7 @@ let TRAIN_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.trainSound };
 let AUDIO_FADE_CONFIG = { ...DEFAULT_GAME_SETTINGS.audioFade };
 let START_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.startSound };
 let END_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.endSound };
+let AUNTIE_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.auntieSound };
 let DOOR_CLOSING_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.doorClosingSound };
 let ANNOUNCEMENT_CONFIG = { ...DEFAULT_GAME_SETTINGS.announcement };
 let AUNTIE_CONFIG = { ...DEFAULT_GAME_SETTINGS.auntieEvent };
@@ -300,6 +305,10 @@ function applyGameSettings(settings) {
   END_SOUND_CONFIG = {
     ...DEFAULT_GAME_SETTINGS.endSound,
     ...readObject(externalSettings.endSound),
+  };
+  AUNTIE_SOUND_CONFIG = {
+    ...DEFAULT_GAME_SETTINGS.auntieSound,
+    ...readObject(externalSettings.auntieSound),
   };
   DOOR_CLOSING_SOUND_CONFIG = {
     ...DEFAULT_GAME_SETTINGS.doorClosingSound,
@@ -664,6 +673,7 @@ function startAuntieEvent() {
   state.auntieOpenElapsed = 0;
   state.auntieRemaining = getAuntieDuration();
   state.lastActionKey = "none:false";
+  playAuntieSound();
 }
 
 function maybeStartAuntieEvent(stationSegment) {
@@ -978,6 +988,7 @@ function populateSettingsForm() {
   );
   setSettingInputValue("startSound.volume", ratioToPercent(START_SOUND_CONFIG.volume));
   setSettingInputValue("endSound.volume", ratioToPercent(END_SOUND_CONFIG.volume));
+  setSettingInputValue("auntieSound.volume", ratioToPercent(AUNTIE_SOUND_CONFIG.volume));
   setSettingInputValue("trainSound.maxConcurrent", TRAIN_SOUND_CONFIG.maxConcurrent);
 }
 
@@ -1115,6 +1126,11 @@ function readSettingsForm() {
     endSound: {
       volume: percentToRatio(
         readSettingNumber("endSound.volume", ratioToPercent(END_SOUND_CONFIG.volume)),
+      ),
+    },
+    auntieSound: {
+      volume: percentToRatio(
+        readSettingNumber("auntieSound.volume", ratioToPercent(AUNTIE_SOUND_CONFIG.volume)),
       ),
     },
   };
@@ -1397,6 +1413,7 @@ function getTrainSoundEffects() {
 
 let activeStartSound = null;
 let activeEndSound = null;
+let activeAuntieSound = null;
 
 function clearStartSound(immediate = false) {
   if (!activeStartSound) {
@@ -1421,6 +1438,22 @@ function clearEndSound(immediate = false) {
 
   const audio = activeEndSound;
   activeEndSound = null;
+
+  if (immediate) {
+    disposeAudio(audio);
+    return;
+  }
+
+  stopAudioWithFade(audio, () => disposeAudio(audio));
+}
+
+function clearAuntieSound(immediate = false) {
+  if (!activeAuntieSound) {
+    return;
+  }
+
+  const audio = activeAuntieSound;
+  activeAuntieSound = null;
 
   if (immediate) {
     disposeAudio(audio);
@@ -1482,6 +1515,97 @@ function playStartSound() {
         }
         disposeAudio(audio);
       });
+  }
+}
+
+function playAuntieSound() {
+  const src = typeof AUNTIE_SOUND_CONFIG.src === "string" ? AUNTIE_SOUND_CONFIG.src.trim() : "";
+
+  if (!src) {
+    logSoundDebug("Auntie sound skipped; no source configured.");
+    return;
+  }
+
+  clearAuntieSound();
+  logSoundDebug("Playing auntie sound.", { src });
+
+  const audio = new Audio(src);
+  const targetVolume = prepareAudioForPlayback(audio, AUNTIE_SOUND_CONFIG.volume ?? 1);
+  audio.preload = "auto";
+  audio.playsInline = true;
+  activeAuntieSound = audio;
+
+  audio.addEventListener("ended", () => {
+    if (activeAuntieSound === audio) {
+      activeAuntieSound = null;
+    }
+
+    disposeAudio(audio);
+  });
+
+  audio.addEventListener("error", () => {
+    if (activeAuntieSound === audio) {
+      activeAuntieSound = null;
+    }
+
+    disposeAudio(audio);
+    logSoundDebug("Auntie sound failed to load.", { src });
+  });
+
+  const playAttempt = audio.play();
+
+  if (playAttempt) {
+    playAttempt
+      .then(() => {
+        startAudioFades(audio, targetVolume);
+        logSoundDebug("Auntie sound playback started.", { src });
+      })
+      .catch((error) => {
+        logSoundDebug("Auntie sound playback was blocked or failed.", {
+          src,
+          error: error?.message ?? String(error),
+        });
+        if (activeAuntieSound === audio) {
+          activeAuntieSound = null;
+        }
+        disposeAudio(audio);
+      });
+  }
+}
+
+function unlockAuntieSound() {
+  const src = typeof AUNTIE_SOUND_CONFIG.src === "string" ? AUNTIE_SOUND_CONFIG.src.trim() : "";
+
+  if (!src) {
+    logSoundDebug("Auntie sound unlock skipped; no source configured.");
+    return;
+  }
+
+  const primer = new Audio(src);
+  primer.volume = 0;
+  primer.muted = true;
+  primer.preload = "auto";
+  primer.playsInline = true;
+
+  const playAttempt = primer.play();
+
+  if (playAttempt) {
+    playAttempt
+      .then(() => {
+        primer.pause();
+        primer.currentTime = 0;
+        disposeAudio(primer);
+        logSoundDebug("Auntie sound unlocked.", { src });
+      })
+      .catch((error) => {
+        disposeAudio(primer);
+        logSoundDebug("Auntie sound unlock failed.", {
+          src,
+          error: error?.message ?? String(error),
+        });
+      });
+  } else {
+    disposeAudio(primer);
   }
 }
 
@@ -2162,6 +2286,7 @@ function handleOrientation(event) {
 function stopAllAudio(immediate = false) {
   clearStartSound(immediate);
   clearEndSound(immediate);
+  clearAuntieSound(immediate);
   trainSoundscape.stop(immediate);
   stationAnnouncementPlayer.stop(immediate);
   doorClosingPlayer.stop(immediate);
@@ -2290,6 +2415,7 @@ function resetState() {
   hideStatusText(true);
   clearStartSound();
   clearEndSound();
+  clearAuntieSound();
   trainSoundscape.stop();
   stationAnnouncementPlayer.stop();
   doorClosingPlayer.stop();
@@ -2316,6 +2442,7 @@ function resetState() {
 function startWaiting() {
   hideStatusText(true);
   clearEndSound();
+  clearAuntieSound();
   trainSoundscape.stop();
   stationAnnouncementPlayer.stop();
   doorClosingPlayer.stop();
@@ -2373,6 +2500,7 @@ function finishRide() {
   hideStatusText(true);
   resetAuntieEvent();
   clearStationSeatOffer();
+  clearAuntieSound();
   trainSoundscape.stop();
   state.phase = "arrived";
   state.rideRemaining = 0;
@@ -2867,6 +2995,7 @@ function renderActions() {
 
 startButtonEl.addEventListener("click", async () => {
   playStartSound();
+  unlockAuntieSound();
   stationAnnouncementPlayer.unlock();
   doorClosingPlayer.unlock();
   trainSoundscape.unlock();

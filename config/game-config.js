@@ -82,6 +82,10 @@ window.TRAIN_TO_BISHAN_GAME_CONFIG = {
     src: "sounds/yay.ogg",
     volume: 1,
   },
+  auntieSound: {
+    src: "sounds/auntie.ogg",
+    volume: 1,
+  },
   doorClosingSound: {
     src: "sounds/doors_are_closing.ogg",
     volume: 1,
