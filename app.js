@@ -10,7 +10,7 @@ const ROUTE_STATIONS = [
   { code: "NS17", name: "Bishan" },
 ];
 const GAME_CONFIG = {
-  trainArrivalDuration: 60_000,
+  trainArrivalDuration: 15_000,
   boardingDuration: 8_000,
   durationBetweenStations: 12_000,
   // Optional per-leg overrides, from City Hall -> Dhoby Ghaut through Braddell -> Bishan.
