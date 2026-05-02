@@ -121,6 +121,7 @@ function getStationSegment() {
         current: ROUTE_STATIONS[index],
         next: ROUTE_STATIONS[index + 1],
         progress: duration > 0 ? elapsed / duration : 1,
+        remaining: Math.max(0, duration - elapsed),
       };
     }
 
@@ -132,6 +133,7 @@ function getStationSegment() {
     current: ROUTE_STATIONS[Math.max(0, finalStationIndex - 1)],
     next: ROUTE_STATIONS[finalStationIndex],
     progress: 1,
+    remaining: 0,
   };
 }
 
@@ -617,7 +619,7 @@ function renderPhaseCopy(paused, upright) {
 }
 
 function renderTimers() {
-  const showPrimaryTimer = state.phase !== "idle" && state.phase !== "waiting";
+  const showPrimaryTimer = state.phase === "boarding";
   metersEl.hidden = !showPrimaryTimer;
   primaryMeterEl.hidden = !showPrimaryTimer;
   metersEl.classList.add("single");
@@ -625,14 +627,7 @@ function renderTimers() {
   if (state.phase === "boarding") {
     primaryLabelEl.textContent = "Boarding";
     primaryTimerEl.textContent = formatTime(state.boardingRemaining);
-  } else if (state.phase === "riding") {
-    primaryLabelEl.textContent = state.seated ? "Ride" : "Standing";
-    primaryTimerEl.textContent = formatTime(state.rideRemaining);
-  } else {
-    primaryLabelEl.textContent = "Arrived";
-    primaryTimerEl.textContent = "00:00";
   }
-
 }
 
 function getActionState(now = performance.now()) {
@@ -677,9 +672,11 @@ function getActionState(now = performance.now()) {
   }
 
   if (state.phase === "riding") {
+    const stationSegment = getStationSegment();
+
     return {
       enabled: false,
-      label: state.seated ? "Resting" : "Riding to Bishan",
+      label: formatTime(stationSegment.remaining),
       type: "none",
     };
   }
