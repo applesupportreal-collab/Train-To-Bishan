@@ -152,7 +152,7 @@ button {
 .station-sign {
   position: absolute;
   top: max(18px, env(safe-area-inset-top));
-  left: 18px;
+  left: 50%;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -163,6 +163,7 @@ button {
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
   font-size: 0.95rem;
   font-weight: 800;
+  transform: translateX(-50%);
 }
 
 .line-code {
@@ -178,12 +179,6 @@ button {
 }
 
 .status-ribbon {
-  position: absolute;
-  top: max(74px, calc(env(safe-area-inset-top) + 54px));
-  left: 18px;
-  right: 18px;
-  z-index: 8;
-  max-width: 460px;
   padding: 10px 12px;
   border-radius: 6px;
   background: rgba(23, 32, 38, 0.86);
@@ -591,11 +586,11 @@ button {
 
 @keyframes pulse {
   from {
-    transform: translateY(0);
+    transform: translate(-50%, 0);
   }
 
   to {
-    transform: translateY(-3px);
+    transform: translate(-50%, -3px);
   }
 }
 
