@@ -1,4 +1,5 @@
 const CONFIG_PATH = "config/game-config.json";
+const SCRIPT_CONFIG_GLOBAL = "TRAIN_TO_BISHAN_GAME_CONFIG";
 const DEFAULT_GAME_SETTINGS = {
   routeStations: [
     { code: "NS25", name: "City Hall" },
@@ -194,6 +195,8 @@ function applyGameSettings(settings) {
 }
 
 async function loadGameSettings() {
+  const scriptConfig = readObject(window[SCRIPT_CONFIG_GLOBAL]);
+
   try {
     const configUrl = new URL(CONFIG_PATH, window.location.href);
     configUrl.searchParams.set("cacheBust", Date.now().toString());
@@ -201,12 +204,22 @@ async function loadGameSettings() {
     const response = await fetch(configUrl, { cache: "no-store" });
 
     if (!response.ok) {
+      if (Object.keys(scriptConfig).length > 0) {
+        applyGameSettings(scriptConfig);
+        return;
+      }
+
       console.warn(`Could not load ${CONFIG_PATH}; using built-in defaults.`);
       return;
     }
 
     applyGameSettings(await response.json());
   } catch (error) {
+    if (Object.keys(scriptConfig).length > 0) {
+      applyGameSettings(scriptConfig);
+      return;
+    }
+
     console.warn(`Could not load ${CONFIG_PATH}; using built-in defaults.`, error);
     applyGameSettings(DEFAULT_GAME_SETTINGS);
   }

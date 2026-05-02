@@ -2,6 +2,8 @@
 
 Edit `game-config.json` to tune the static game without changing JavaScript.
 
+- `game-config.json` is used when the page is served from a static host such as GitHub Pages.
+- `game-config.js` is a direct-file fallback for browsers that block `file://` JSON fetches; keep it in sync if you open `index.html` directly.
 - `timing.initialTrainArrivalDuration` is the first City Hall train-arrival countdown, in milliseconds.
 - `timing.durationBetweenStations` is the default travel time for each station-to-station leg, in milliseconds.
 - `timing.stationDurations` can override individual legs in order: City Hall to Dhoby Ghaut, Dhoby Ghaut to Somerset, and so on. Leave it empty to use the default for every leg.

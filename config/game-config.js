@@ -1,0 +1,95 @@
+window.TRAIN_TO_BISHAN_GAME_CONFIG = {
+  routeStations: [
+    {
+      code: "NS25",
+      name: "City Hall",
+    },
+    {
+      code: "NS24",
+      name: "Dhoby Ghaut",
+    },
+    {
+      code: "NS23",
+      name: "Somerset",
+    },
+    {
+      code: "NS22",
+      name: "Orchard",
+    },
+    {
+      code: "NS21",
+      name: "Newton",
+    },
+    {
+      code: "NS20",
+      name: "Novena",
+    },
+    {
+      code: "NS19",
+      name: "Toa Payoh",
+    },
+    {
+      code: "NS18",
+      name: "Braddell",
+    },
+    {
+      code: "NS17",
+      name: "Bishan",
+    },
+  ],
+  timing: {
+    initialTrainArrivalDuration: 10000,
+    trainArrivalDuration: 15000,
+    boardingDuration: 8000,
+    durationBetweenStations: 20000,
+    stationDwellDuration: 20000,
+    stationDurations: [],
+  },
+  seatRush: {
+    gainPerPress: 0.08,
+    decayPerSecond: 0.16,
+    seatThreshold: 0.95,
+  },
+  upright: {
+    betaMin: 52,
+    betaMax: 128,
+    gammaMax: 38,
+    staleAfter: 1600,
+  },
+  trainSound: {
+    minDelay: 3500,
+    maxDelay: 13000,
+    firstMinDelay: 900,
+    firstMaxDelay: 2400,
+    retryMinDelay: 1500,
+    retryMaxDelay: 3000,
+    defaultVolume: 1,
+    maxConcurrent: 1,
+  },
+  startSound: {
+    src: "sounds/train_service_ends_at_bishan.ogg",
+    volume: 1,
+  },
+  doorClosingSound: {
+    src: "sounds/doors_are_closing.ogg",
+    volume: 1,
+    leadTime: 10000,
+  },
+  announcement: {
+    basePath: "sounds",
+    prefix: "next_station",
+    nextStationPrefix: "next_station",
+    arrivingPrefix: "arriving",
+    extension: "ogg",
+    volume: 1,
+    arrivingLeadTime: 10000,
+  },
+  vibration: {
+    actionActivation: [35, 25, 35],
+    boardingStart: [70, 40, 70],
+    seated: 90,
+    standing: [40, 35, 40],
+    arrival: [120, 50, 120],
+    rushTap: 8,
+  },
+};
