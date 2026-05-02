@@ -3398,7 +3398,8 @@ function tick(now) {
     }
   }
 
-  trainSoundscape.tick(now, canMove && !state.breakdownActive);
+  const cabinAudioCanPlay = state.phase === "riding" && !state.breakdownActive;
+  trainSoundscape.tick(now, cabinAudioCanPlay);
   render();
   requestAnimationFrame(tick);
 }
