@@ -1506,7 +1506,7 @@ function getActionState(now = performance.now()) {
   if (state.phase === "boarding") {
     return {
       enabled: countdownCanMove(now),
-      label: `Snatch seat ${formatTime(state.boardingRemaining)}`,
+      label: `SNATCH SEAT!!! ${formatTime(state.boardingRemaining)}`,
       type: "rush",
     };
   }

@@ -784,7 +784,12 @@ button {
 }
 
 .action-button[data-action="rush"] {
-  border-color: rgba(207, 36, 52, 0.38);
+  border-color: #ffb000;
+  background: linear-gradient(180deg, #ffe45c 0%, #ffb000 48%, #ff7a00 100%);
+  color: #172026;
+  box-shadow:
+    0 0 0 4px rgba(255, 176, 0, 0.24),
+    0 14px 28px rgba(255, 122, 0, 0.38);
 }
 
 .action-button[data-action="rush"]::before,
@@ -799,12 +804,12 @@ button {
 }
 
 .action-button[data-action="rush"]::before {
-  background: rgba(255, 255, 255, 0.32);
+  background: rgba(23, 32, 38, 0.2);
 }
 
 .action-button[data-action="rush"]::after {
   width: calc(100% - 36px);
-  background: linear-gradient(90deg, #b91f2d, #e54555);
+  background: linear-gradient(90deg, #8f0f1f, #cf2434);
   transform: scaleX(var(--seat-progress-ratio, 0));
   transform-origin: left center;
   transition: transform 120ms linear;
