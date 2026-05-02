@@ -468,6 +468,7 @@ const STATUS_TEXT_DURATION = 5_000;
 const STATUS_TEXT_FADE_DURATION = 420;
 let statusTextHideTimer = null;
 let statusTextClearTimer = null;
+let rushShakeTimer = null;
 
 const state = {
   phase: "idle",
@@ -901,6 +902,22 @@ function getAuntieVignetteLevel() {
   }
 
   return clamp(state.auntieOpenElapsed / getAuntieScoldAfter(), 0, 1);
+}
+
+function triggerRushShake() {
+  if (!gameEl) {
+    return;
+  }
+
+  window.clearTimeout(rushShakeTimer);
+  gameEl.classList.remove("rush-shake");
+  // Force the animation to restart even during rapid taps.
+  void gameEl.offsetWidth;
+  gameEl.classList.add("rush-shake");
+  rushShakeTimer = window.setTimeout(() => {
+    gameEl.classList.remove("rush-shake");
+    rushShakeTimer = null;
+  }, 180);
 }
 
 function resetTrainBreakdown() {
@@ -3211,6 +3228,7 @@ function rush() {
   state.seatProgress = clamp(state.seatProgress + SEAT_RUSH_CONFIG.gainPerPress, 0, 1);
   queueEl.classList.add("rushing");
   window.setTimeout(() => queueEl.classList.remove("rushing"), 120);
+  triggerRushShake();
   vibrate(VIBRATION_CONFIG.rushTap);
 
   if (
@@ -3475,7 +3493,14 @@ function renderStationSegment() {
 }
 
 function renderAuntieEvent() {
-  auntieVignetteEl.style.opacity = getAuntieVignetteLevel().toFixed(3);
+  const auntieDangerLevel = getAuntieVignetteLevel();
+  const auntieShakeDistance = Math.round((1 + auntieDangerLevel * 6) * 100) / 100;
+  auntieVignetteEl.style.opacity = auntieDangerLevel.toFixed(3);
+  gameEl.style.setProperty("--auntie-shake-x", `${auntieShakeDistance}px`);
+  gameEl.style.setProperty("--auntie-shake-y", `${Math.max(1, auntieShakeDistance * 0.58)}px`);
+  gameEl.style.setProperty("--auntie-shake-x-neg", `${-auntieShakeDistance}px`);
+  gameEl.style.setProperty("--auntie-shake-y-neg", `${-Math.max(1, auntieShakeDistance * 0.58)}px`);
+  gameEl.classList.toggle("auntie-shake", auntieDangerLevel > 0);
   sleepDimEl.style.opacity = state.auntieDimLevel.toFixed(3);
   auntieImageEl.src = getAuntieImageSrc();
   auntieEventEl.style.setProperty(
