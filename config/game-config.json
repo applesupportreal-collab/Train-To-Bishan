@@ -65,6 +65,10 @@
     "defaultVolume": 1,
     "maxConcurrent": 1
   },
+  "startSound": {
+    "src": "sounds/train_service_ends_at_bishan.ogg",
+    "volume": 1
+  },
   "announcement": {
     "basePath": "sounds",
     "prefix": "next_station",

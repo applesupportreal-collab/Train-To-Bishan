@@ -39,6 +39,10 @@ const DEFAULT_GAME_SETTINGS = {
     defaultVolume: 1,
     maxConcurrent: 1,
   },
+  startSound: {
+    src: "sounds/train_service_ends_at_bishan.ogg",
+    volume: 1,
+  },
   announcement: {
     basePath: "sounds",
     prefix: "next_station",
@@ -71,6 +75,7 @@ const DURATIONS = {
 let SEAT_RUSH_CONFIG = { ...DEFAULT_GAME_SETTINGS.seatRush };
 let UPRIGHT = { ...DEFAULT_GAME_SETTINGS.upright };
 let TRAIN_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.trainSound };
+let START_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.startSound };
 let ANNOUNCEMENT_CONFIG = { ...DEFAULT_GAME_SETTINGS.announcement };
 let VIBRATION_CONFIG = cloneVibrationConfig(DEFAULT_GAME_SETTINGS.vibration);
 
@@ -145,6 +150,10 @@ function applyGameSettings(settings) {
   TRAIN_SOUND_CONFIG = {
     ...DEFAULT_GAME_SETTINGS.trainSound,
     ...readObject(externalSettings.trainSound),
+  };
+  START_SOUND_CONFIG = {
+    ...DEFAULT_GAME_SETTINGS.startSound,
+    ...readObject(externalSettings.startSound),
   };
   ANNOUNCEMENT_CONFIG = {
     ...DEFAULT_GAME_SETTINGS.announcement,
@@ -349,6 +358,57 @@ function getTrainSoundEffects() {
       };
     })
     .filter(Boolean);
+}
+
+let activeStartSound = null;
+
+function clearStartSound() {
+  if (!activeStartSound) {
+    return;
+  }
+
+  activeStartSound.pause();
+  activeStartSound.removeAttribute("src");
+  activeStartSound.load();
+  activeStartSound = null;
+}
+
+function playStartSound() {
+  const src = typeof START_SOUND_CONFIG.src === "string" ? START_SOUND_CONFIG.src.trim() : "";
+
+  if (!src) {
+    return;
+  }
+
+  clearStartSound();
+
+  const audio = new Audio(src);
+  audio.volume = clampVolume(START_SOUND_CONFIG.volume ?? 1);
+  audio.preload = "auto";
+  audio.playsInline = true;
+  activeStartSound = audio;
+
+  audio.addEventListener("ended", () => {
+    if (activeStartSound === audio) {
+      activeStartSound = null;
+    }
+  });
+
+  audio.addEventListener("error", () => {
+    if (activeStartSound === audio) {
+      activeStartSound = null;
+    }
+  });
+
+  const playAttempt = audio.play();
+
+  if (playAttempt) {
+    playAttempt.catch(() => {
+      if (activeStartSound === audio) {
+        activeStartSound = null;
+      }
+    });
+  }
 }
 
 function getStationAudioSlug(stationName) {
@@ -697,6 +757,7 @@ function handleOrientation(event) {
 }
 
 function resetState() {
+  clearStartSound();
   trainSoundscape.stop();
   stationAnnouncementPlayer.stop();
   state.phase = "idle";
@@ -1043,6 +1104,7 @@ function renderActions() {
 }
 
 startButtonEl.addEventListener("click", async () => {
+  playStartSound();
   stationAnnouncementPlayer.unlock();
   trainSoundscape.unlock();
   await requestMotionAccess();
