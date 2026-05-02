@@ -687,6 +687,7 @@ function render() {
   queueEl.classList.toggle("hidden", state.phase === "riding" || state.phase === "arrived");
   trainInteriorEl.hidden = state.phase !== "riding" && state.phase !== "arrived";
   statusRibbonEl.classList.toggle("success", state.phase === "riding" && state.seated);
+  statusRibbonEl.classList.toggle("danger", state.phase === "riding" && !state.seated);
 
   sensorFallbackEl.hidden = !needsMotionFallback;
   sensorFallbackEl.textContent = state.simulatedUpright ? "Simulated upright" : "Simulated tilted";
@@ -748,7 +749,7 @@ function renderPhaseCopy(paused, upright) {
   }
 
   if (state.phase === "riding") {
-    statusRibbonEl.textContent = "Standing room only";
+    statusRibbonEl.textContent = "Failed to get a seat! Standing it shall be...";
     messageEl.textContent = usesUprightCheck
       ? "Keep the phone upright until Bishan."
       : "Ride it out standing until Bishan.";
