@@ -11,6 +11,7 @@ Edit `game-config.json` to tune the static game without changing JavaScript.
 - `upright.betaMin`, `upright.betaMax`, and `upright.gammaMax` control the accepted phone angle range.
 - `upright.checkInterval` controls how often the app re-checks the phone angle, in milliseconds.
 - `startSound` is the sound that plays from the Start button tap.
+- `endSound` is the sound that plays when the player reaches Bishan.
 - `doorClosingSound.leadTime` controls how many milliseconds before train departure the `doors_are_closing.ogg` clip plays.
 - `announcement.arrivingLeadTime` controls how many milliseconds before each station the `arriving_<station_name>.ogg` clip plays.
 - `auntieEvent.chance` controls the odds that an auntie appears on each departure while the player has a seat.

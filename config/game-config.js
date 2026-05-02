@@ -71,6 +71,10 @@ window.TRAIN_TO_BISHAN_GAME_CONFIG = {
     src: "sounds/train_service_ends_at_bishan.ogg",
     volume: 1,
   },
+  endSound: {
+    src: "sounds/yay.ogg",
+    volume: 1,
+  },
   doorClosingSound: {
     src: "sounds/doors_are_closing.ogg",
     volume: 1,

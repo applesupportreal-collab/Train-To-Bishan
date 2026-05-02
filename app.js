@@ -46,6 +46,10 @@ const DEFAULT_GAME_SETTINGS = {
     src: "sounds/train_service_ends_at_bishan.ogg",
     volume: 1,
   },
+  endSound: {
+    src: "sounds/yay.ogg",
+    volume: 1,
+  },
   doorClosingSound: {
     src: "sounds/doors_are_closing.ogg",
     volume: 1,
@@ -97,6 +101,7 @@ let SEAT_RUSH_CONFIG = { ...DEFAULT_GAME_SETTINGS.seatRush };
 let UPRIGHT = { ...DEFAULT_GAME_SETTINGS.upright };
 let TRAIN_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.trainSound };
 let START_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.startSound };
+let END_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.endSound };
 let DOOR_CLOSING_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.doorClosingSound };
 let ANNOUNCEMENT_CONFIG = { ...DEFAULT_GAME_SETTINGS.announcement };
 let AUNTIE_CONFIG = { ...DEFAULT_GAME_SETTINGS.auntieEvent };
@@ -191,6 +196,10 @@ function applyGameSettings(settings) {
   START_SOUND_CONFIG = {
     ...DEFAULT_GAME_SETTINGS.startSound,
     ...readObject(externalSettings.startSound),
+  };
+  END_SOUND_CONFIG = {
+    ...DEFAULT_GAME_SETTINGS.endSound,
+    ...readObject(externalSettings.endSound),
   };
   DOOR_CLOSING_SOUND_CONFIG = {
     ...DEFAULT_GAME_SETTINGS.doorClosingSound,
@@ -699,6 +708,7 @@ function getTrainSoundEffects() {
 }
 
 let activeStartSound = null;
+let activeEndSound = null;
 
 function clearStartSound() {
   if (!activeStartSound) {
@@ -709,6 +719,17 @@ function clearStartSound() {
   activeStartSound.removeAttribute("src");
   activeStartSound.load();
   activeStartSound = null;
+}
+
+function clearEndSound() {
+  if (!activeEndSound) {
+    return;
+  }
+
+  activeEndSound.pause();
+  activeEndSound.removeAttribute("src");
+  activeEndSound.load();
+  activeEndSound = null;
 }
 
 function playStartSound() {
@@ -756,6 +777,56 @@ function playStartSound() {
         });
         if (activeStartSound === audio) {
           activeStartSound = null;
+        }
+      });
+  }
+}
+
+function playEndSound() {
+  const src = typeof END_SOUND_CONFIG.src === "string" ? END_SOUND_CONFIG.src.trim() : "";
+
+  if (!src) {
+    logSoundDebug("End sound skipped; no source configured.");
+    return;
+  }
+
+  clearEndSound();
+  logSoundDebug("Playing end sound.", { src });
+
+  const audio = new Audio(src);
+  audio.volume = clampVolume(END_SOUND_CONFIG.volume ?? 1);
+  audio.preload = "auto";
+  audio.playsInline = true;
+  activeEndSound = audio;
+
+  audio.addEventListener("ended", () => {
+    if (activeEndSound === audio) {
+      activeEndSound = null;
+    }
+  });
+
+  audio.addEventListener("error", () => {
+    if (activeEndSound === audio) {
+      activeEndSound = null;
+    }
+
+    logSoundDebug("End sound failed to load.", { src });
+  });
+
+  const playAttempt = audio.play();
+
+  if (playAttempt) {
+    playAttempt
+      .then(() => {
+        logSoundDebug("End sound playback started.", { src });
+      })
+      .catch((error) => {
+        logSoundDebug("End sound playback was blocked or failed.", {
+          src,
+          error: error?.message ?? String(error),
+        });
+        if (activeEndSound === audio) {
+          activeEndSound = null;
         }
       });
   }
@@ -1363,6 +1434,7 @@ function handleOrientation(event) {
 function resetState() {
   hideStatusText(true);
   clearStartSound();
+  clearEndSound();
   trainSoundscape.stop();
   stationAnnouncementPlayer.stop();
   doorClosingPlayer.stop();
@@ -1385,6 +1457,7 @@ function resetState() {
 
 function startWaiting() {
   hideStatusText(true);
+  clearEndSound();
   trainSoundscape.stop();
   stationAnnouncementPlayer.stop();
   doorClosingPlayer.stop();
@@ -1439,6 +1512,7 @@ function finishRide() {
   state.phase = "arrived";
   state.rideRemaining = 0;
   vibrate(VIBRATION_CONFIG.arrival);
+  playEndSound();
   render();
 }
 
@@ -1671,9 +1745,7 @@ function renderSuccessScreen() {
   }
 
   const destination = getDestinationStation();
-  successMessageEl.textContent = state.seated
-    ? `You made it to ${destination.name} station with a seat.`
-    : `You made it to ${destination.name} station standing.`;
+  successMessageEl.textContent = `You made it to ${destination.name}!`;
 }
 
 function renderStationSegment() {
