@@ -14,6 +14,8 @@ window.TRAIN_SOUND_EFFECTS = [
 
 The game will choose from this list at random only after the player is inside the train.
 
+`doors_are_closing.ogg` plays during City Hall boarding and before the train leaves each intermediate station.
+
 Next-station announcements use this filename format:
 
 ```text

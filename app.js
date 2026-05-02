@@ -43,6 +43,11 @@ const DEFAULT_GAME_SETTINGS = {
     src: "sounds/train_service_ends_at_bishan.ogg",
     volume: 1,
   },
+  doorClosingSound: {
+    src: "sounds/doors_are_closing.ogg",
+    volume: 1,
+    leadTime: 10_000,
+  },
   announcement: {
     basePath: "sounds",
     prefix: "next_station",
@@ -79,6 +84,7 @@ let SEAT_RUSH_CONFIG = { ...DEFAULT_GAME_SETTINGS.seatRush };
 let UPRIGHT = { ...DEFAULT_GAME_SETTINGS.upright };
 let TRAIN_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.trainSound };
 let START_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.startSound };
+let DOOR_CLOSING_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.doorClosingSound };
 let ANNOUNCEMENT_CONFIG = { ...DEFAULT_GAME_SETTINGS.announcement };
 let VIBRATION_CONFIG = cloneVibrationConfig(DEFAULT_GAME_SETTINGS.vibration);
 
@@ -158,6 +164,10 @@ function applyGameSettings(settings) {
     ...DEFAULT_GAME_SETTINGS.startSound,
     ...readObject(externalSettings.startSound),
   };
+  DOOR_CLOSING_SOUND_CONFIG = {
+    ...DEFAULT_GAME_SETTINGS.doorClosingSound,
+    ...readObject(externalSettings.doorClosingSound),
+  };
   ANNOUNCEMENT_CONFIG = {
     ...DEFAULT_GAME_SETTINGS.announcement,
     ...readObject(externalSettings.announcement),
@@ -215,6 +225,7 @@ const state = {
   seatProgress: 0,
   seated: false,
   arrivingAnnouncementsPlayed: new Set(),
+  doorClosingAnnouncementsPlayed: new Set(),
   lastActionKey: "none:false",
   motionPermission: "unknown",
   usingSimulatedMotion: false,
@@ -335,6 +346,13 @@ function getArrivingLeadTime() {
     : DEFAULT_GAME_SETTINGS.announcement.arrivingLeadTime;
 }
 
+function getDoorClosingLeadTime() {
+  const configuredLeadTime = Number(DOOR_CLOSING_SOUND_CONFIG.leadTime);
+  return Number.isFinite(configuredLeadTime) && configuredLeadTime >= 0
+    ? configuredLeadTime
+    : DEFAULT_GAME_SETTINGS.doorClosingSound.leadTime;
+}
+
 function getStationAnnouncementKey(station, type, legIndex = "") {
   return `${type}:${legIndex}:${station.code}:${station.name}`;
 }
@@ -430,6 +448,122 @@ function playStartSound() {
       }
     });
   }
+}
+
+function createDoorClosingSoundPlayer() {
+  let pending = false;
+  let activeAudio = null;
+
+  function getSrc() {
+    return typeof DOOR_CLOSING_SOUND_CONFIG.src === "string"
+      ? DOOR_CLOSING_SOUND_CONFIG.src.trim()
+      : "";
+  }
+
+  function clearActiveAudio() {
+    if (!activeAudio) {
+      return;
+    }
+
+    activeAudio.pause();
+    activeAudio.removeAttribute("src");
+    activeAudio.load();
+    activeAudio = null;
+  }
+
+  function createAudio(muted = false) {
+    const audio = new Audio(getSrc());
+    audio.volume = muted ? 0 : clampVolume(DOOR_CLOSING_SOUND_CONFIG.volume ?? 1);
+    audio.muted = muted;
+    audio.preload = "auto";
+    audio.playsInline = true;
+    return audio;
+  }
+
+  return {
+    blocked: false,
+    hasSound() {
+      return Boolean(getSrc());
+    },
+    unlock() {
+      if (!this.hasSound()) {
+        return;
+      }
+
+      const primer = createAudio(true);
+      const playAttempt = primer.play();
+
+      if (playAttempt) {
+        playAttempt
+          .then(() => {
+            primer.pause();
+            primer.currentTime = 0;
+          })
+          .catch(() => {});
+      }
+    },
+    stop() {
+      pending = false;
+      this.blocked = false;
+      clearActiveAudio();
+    },
+    play() {
+      if (!this.hasSound()) {
+        return;
+      }
+
+      pending = true;
+      this.blocked = false;
+      clearActiveAudio();
+
+      const audio = createAudio();
+      activeAudio = audio;
+
+      audio.addEventListener("ended", () => {
+        if (activeAudio === audio) {
+          activeAudio = null;
+        }
+      });
+
+      audio.addEventListener("error", () => {
+        if (activeAudio === audio) {
+          activeAudio = null;
+        }
+
+        pending = false;
+      });
+
+      const playAttempt = audio.play();
+
+      if (playAttempt) {
+        playAttempt
+          .then(() => {
+            pending = false;
+          })
+          .catch((error) => {
+            clearActiveAudio();
+
+            if (error?.name === "NotAllowedError") {
+              this.blocked = true;
+              render();
+            } else {
+              pending = false;
+            }
+          });
+      }
+    },
+    enableFromGesture() {
+      this.blocked = false;
+
+      if (pending) {
+        this.play();
+      } else {
+        this.unlock();
+      }
+
+      render();
+    },
+  };
 }
 
 function getStationAudioSlug(stationName) {
@@ -687,6 +821,7 @@ function createTrainSoundscape() {
 
 const trainSoundscape = createTrainSoundscape();
 const stationAnnouncementPlayer = createStationAnnouncementPlayer();
+const doorClosingPlayer = createDoorClosingSoundPlayer();
 const startScreenEl = document.querySelector("#startScreen");
 const playScreenEl = document.querySelector("#playScreen");
 const successScreenEl = document.querySelector("#successScreen");
@@ -803,12 +938,14 @@ function resetState() {
   clearStartSound();
   trainSoundscape.stop();
   stationAnnouncementPlayer.stop();
+  doorClosingPlayer.stop();
   state.phase = "idle";
   state.lastTick = 0;
   resetCountdowns();
   state.seatProgress = 0;
   state.seated = false;
   state.arrivingAnnouncementsPlayed = new Set();
+  state.doorClosingAnnouncementsPlayed = new Set();
   state.lastActionKey = "none:false";
   state.simulatedUpright = true;
   render();
@@ -817,12 +954,14 @@ function resetState() {
 function startWaiting() {
   trainSoundscape.stop();
   stationAnnouncementPlayer.stop();
+  doorClosingPlayer.stop();
   state.phase = "waiting";
   state.lastTick = performance.now();
   resetCountdowns();
   state.seatProgress = 0;
   state.seated = false;
   state.arrivingAnnouncementsPlayed = new Set();
+  state.doorClosingAnnouncementsPlayed = new Set();
   state.lastActionKey = "none:false";
   requestAnimationFrame(tick);
   render();
@@ -841,6 +980,7 @@ function startRide(seated) {
   state.seated = seated;
   state.rideRemaining = DURATIONS.ride;
   state.arrivingAnnouncementsPlayed = new Set();
+  state.doorClosingAnnouncementsPlayed = new Set();
   stationAnnouncementPlayer.playNextStation(getFirstNextStation());
   trainSoundscape.start();
   vibrate(seated ? VIBRATION_CONFIG.seated : VIBRATION_CONFIG.standing);
@@ -905,6 +1045,36 @@ function playDueArrivingAnnouncement() {
   stationAnnouncementPlayer.playArrivingAtStation(stationSegment.next);
 }
 
+function playDueDoorClosingSound() {
+  const leadTime = getDoorClosingLeadTime();
+  let key = "";
+
+  if (state.phase === "boarding") {
+    if (state.boardingRemaining > leadTime) {
+      return;
+    }
+
+    key = getStationAnnouncementKey(getOriginStation(), "doors", "boarding");
+  } else if (state.phase === "riding") {
+    const stationSegment = getStationSegment();
+
+    if (stationSegment.mode !== "dwell" || stationSegment.remaining > leadTime) {
+      return;
+    }
+
+    key = getStationAnnouncementKey(stationSegment.current, "doors", stationSegment.legIndex);
+  } else {
+    return;
+  }
+
+  if (state.doorClosingAnnouncementsPlayed.has(key)) {
+    return;
+  }
+
+  state.doorClosingAnnouncementsPlayed.add(key);
+  doorClosingPlayer.play();
+}
+
 function tick(now) {
   if (state.phase === "idle" || state.phase === "arrived") {
     return;
@@ -930,6 +1100,7 @@ function tick(now) {
         0,
         1,
       );
+      playDueDoorClosingSound();
 
       if (state.boardingRemaining <= 0) {
         state.boardingRemaining = 0;
@@ -938,6 +1109,7 @@ function tick(now) {
     } else if (state.phase === "riding") {
       state.rideRemaining -= elapsed;
       playDueArrivingAnnouncement();
+      playDueDoorClosingSound();
 
       if (state.rideRemaining <= 0) {
         finishRide();
@@ -1093,6 +1265,7 @@ function getActionState(now = performance.now()) {
   if (
     state.phase === "riding" &&
     (stationAnnouncementPlayer.blocked ||
+      doorClosingPlayer.blocked ||
       (trainSoundscape.blocked && trainSoundscape.hasSounds()))
   ) {
     return {
@@ -1151,9 +1324,14 @@ function triggerAction() {
   }
 
   if (action.type === "rush") {
+    if (doorClosingPlayer.blocked) {
+      doorClosingPlayer.enableFromGesture();
+    }
+
     rush();
   } else if (action.type === "sound") {
     stationAnnouncementPlayer.enableFromGesture();
+    doorClosingPlayer.enableFromGesture();
     trainSoundscape.enableFromGesture();
   } else if (action.type === "reset") {
     resetState();
@@ -1184,6 +1362,7 @@ function renderActions() {
 startButtonEl.addEventListener("click", async () => {
   playStartSound();
   stationAnnouncementPlayer.unlock();
+  doorClosingPlayer.unlock();
   trainSoundscape.unlock();
   await requestMotionAccess();
   startWaiting();

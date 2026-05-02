@@ -69,6 +69,11 @@
     "src": "sounds/train_service_ends_at_bishan.ogg",
     "volume": 1
   },
+  "doorClosingSound": {
+    "src": "sounds/doors_are_closing.ogg",
+    "volume": 1,
+    "leadTime": 10000
+  },
   "announcement": {
     "basePath": "sounds",
     "prefix": "next_station",
