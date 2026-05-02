@@ -13,6 +13,7 @@ const GAME_CONFIG = {
   trainArrivalDuration: 15_000,
   boardingDuration: 8_000,
   durationBetweenStations: 12_000,
+  stationDwellDuration: 20_000,
   // Optional per-leg overrides, from City Hall -> Dhoby Ghaut through Braddell -> Bishan.
   stationDurations: [],
 };
@@ -112,7 +113,10 @@ function getStationDurations() {
 }
 
 function getRideDuration() {
-  return getStationDurations().reduce((total, duration) => total + duration, 0);
+  const stationDurations = getStationDurations();
+  const dwellCount = Math.max(0, stationDurations.length - 1);
+  const travelDuration = stationDurations.reduce((total, duration) => total + duration, 0);
+  return travelDuration + dwellCount * GAME_CONFIG.stationDwellDuration;
 }
 
 function getStationSegment() {
@@ -136,6 +140,21 @@ function getStationSegment() {
     }
 
     elapsed -= duration;
+
+    if (index < stationDurations.length - 1) {
+      const dwellDuration = GAME_CONFIG.stationDwellDuration;
+
+      if (elapsed < dwellDuration) {
+        return {
+          current: ROUTE_STATIONS[index + 1],
+          next: ROUTE_STATIONS[index + 2],
+          progress: 0,
+          remaining: Math.max(0, dwellDuration - elapsed),
+        };
+      }
+
+      elapsed -= dwellDuration;
+    }
   }
 
   const finalStationIndex = ROUTE_STATIONS.length - 1;
