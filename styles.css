@@ -297,80 +297,11 @@ button {
   text-transform: none;
 }
 
-.upright-demo {
-  position: relative;
-  display: grid;
-  width: 86px;
+.upright-card img {
+  display: block;
+  width: min(100%, 116px);
   height: 76px;
-  place-items: center;
-  perspective: 180px;
-}
-
-.phone-shape {
-  position: relative;
-  z-index: 2;
-  width: 34px;
-  height: 58px;
-  border: 3px solid #26313a;
-  border-radius: 7px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 250, 240, 0.68)),
-    #f7f3eb;
-  box-shadow: 0 10px 14px rgba(38, 49, 58, 0.16);
-}
-
-.phone-shape::before {
-  position: absolute;
-  top: 4px;
-  left: 50%;
-  width: 12px;
-  height: 3px;
-  border-radius: 999px;
-  background: #26313a;
-  content: "";
-  transform: translateX(-50%);
-}
-
-.tilt-arc {
-  position: absolute;
-  width: 70px;
-  height: 42px;
-  border: 3px solid transparent;
-  border-top-color: var(--red);
-  border-radius: 999px 999px 0 0;
-}
-
-.tilt-arc::before,
-.tilt-arc::after {
-  position: absolute;
-  top: -5px;
-  width: 8px;
-  height: 8px;
-  border-top: 3px solid var(--red);
-  border-right: 3px solid var(--red);
-  content: "";
-}
-
-.tilt-arc::before {
-  left: 4px;
-  transform: rotate(-145deg);
-}
-
-.tilt-arc::after {
-  right: 4px;
-  transform: rotate(35deg);
-}
-
-.beta-demo .phone-shape {
-  transform: rotateX(28deg);
-}
-
-.gamma-demo .phone-shape {
-  transform: rotateZ(-18deg);
-}
-
-.gamma-demo .tilt-arc {
-  transform: rotate(90deg);
+  object-fit: contain;
 }
 
 .settings-actions {
