@@ -47,7 +47,207 @@
           </p>
         </div>
 
-        <button class="primary" id="startButton" type="button">Start commute</button>
+        <div class="start-actions">
+          <button class="primary" id="startButton" type="button">Start commute</button>
+          <button class="secondary icon-text-button" id="settingsButton" type="button">
+            <span class="material-symbols-rounded" aria-hidden="true">settings</span>
+            Settings
+          </button>
+        </div>
+      </section>
+
+      <section class="settings-screen screen" id="settingsScreen" aria-label="Train to Bishan settings" hidden>
+        <header class="settings-header">
+          <button
+            class="icon-button material-symbols-rounded"
+            id="settingsBackButton"
+            type="button"
+            aria-label="Back to main screen"
+          >
+            arrow_back
+          </button>
+          <div>
+            <span class="line-code">Settings</span>
+            <h2>Settings</h2>
+          </div>
+        </header>
+
+        <form class="settings-form" id="settingsForm">
+          <fieldset>
+            <legend>Timing</legend>
+            <label>
+              <span>Initial train arrival</span>
+              <input data-setting="timing.initialTrainArrivalDuration" type="number" min="0" step="0.5" required />
+              <small>s</small>
+            </label>
+            <label>
+              <span>Boarding window</span>
+              <input data-setting="timing.boardingDuration" type="number" min="1" step="0.5" required />
+              <small>s</small>
+            </label>
+            <label>
+              <span>Between stations</span>
+              <input data-setting="timing.durationBetweenStations" type="number" min="1" step="0.5" required />
+              <small>s</small>
+            </label>
+            <label>
+              <span>Station stop</span>
+              <input data-setting="timing.stationDwellDuration" type="number" min="0" step="0.5" required />
+              <small>s</small>
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Seat Rush</legend>
+            <label>
+              <span>Gain per tap</span>
+              <input data-setting="seatRush.gainPerPress" type="number" min="1" max="100" step="1" required />
+              <small>%</small>
+            </label>
+            <label>
+              <span>Decay per second</span>
+              <input data-setting="seatRush.decayPerSecond" type="number" min="0" max="100" step="1" required />
+              <small>%</small>
+            </label>
+            <label>
+              <span>Seat threshold</span>
+              <input data-setting="seatRush.seatThreshold" type="number" min="1" max="100" step="1" required />
+              <small>%</small>
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Upright</legend>
+            <label>
+              <span>Beta minimum</span>
+              <input data-setting="upright.betaMin" type="number" min="0" max="180" step="1" required />
+              <small>deg</small>
+            </label>
+            <label>
+              <span>Beta maximum</span>
+              <input data-setting="upright.betaMax" type="number" min="0" max="180" step="1" required />
+              <small>deg</small>
+            </label>
+            <label>
+              <span>Gamma maximum</span>
+              <input data-setting="upright.gammaMax" type="number" min="0" max="90" step="1" required />
+              <small>deg</small>
+            </label>
+            <label>
+              <span>Check interval</span>
+              <input data-setting="upright.checkInterval" type="number" min="0" step="50" required />
+              <small>ms</small>
+            </label>
+            <label>
+              <span>Motion stale after</span>
+              <input data-setting="upright.staleAfter" type="number" min="0" step="100" required />
+              <small>ms</small>
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Auntie</legend>
+            <label>
+              <span>Appearance chance</span>
+              <input data-setting="auntieEvent.chance" type="number" min="0" max="100" step="1" required />
+              <small>%</small>
+            </label>
+            <label>
+              <span>Scold timer</span>
+              <input data-setting="auntieEvent.scoldAfter" type="number" min="0.5" step="0.5" required />
+              <small>s</small>
+            </label>
+            <label>
+              <span>Minimum stay</span>
+              <input data-setting="auntieEvent.minDuration" type="number" min="0" step="0.5" required />
+              <small>s</small>
+            </label>
+            <label>
+              <span>Maximum stay</span>
+              <input data-setting="auntieEvent.maxDuration" type="number" min="0" step="0.5" required />
+              <small>s</small>
+            </label>
+            <label>
+              <span>Sleep fade</span>
+              <input data-setting="auntieEvent.fadeDuration" type="number" min="0" step="0.1" required />
+              <small>s</small>
+            </label>
+            <label>
+              <span>Open eye threshold</span>
+              <input data-setting="auntieEvent.eyesOpenThreshold" type="number" min="0" max="100" step="1" required />
+              <small>%</small>
+            </label>
+            <label>
+              <span>Slide duration</span>
+              <input data-setting="auntieEvent.slideDuration" type="number" min="0" step="0.1" required />
+              <small>s</small>
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Audio</legend>
+            <label>
+              <span>Fade duration</span>
+              <input data-setting="audioFade.duration" type="number" min="0" step="0.1" required />
+              <small>s</small>
+            </label>
+            <label>
+              <span>Random sound minimum</span>
+              <input data-setting="trainSound.minDelay" type="number" min="0" step="0.5" required />
+              <small>s</small>
+            </label>
+            <label>
+              <span>Random sound maximum</span>
+              <input data-setting="trainSound.maxDelay" type="number" min="0" step="0.5" required />
+              <small>s</small>
+            </label>
+            <label>
+              <span>Arriving lead time</span>
+              <input data-setting="announcement.arrivingLeadTime" type="number" min="0" step="0.5" required />
+              <small>s</small>
+            </label>
+            <label>
+              <span>Door closing lead time</span>
+              <input data-setting="doorClosingSound.leadTime" type="number" min="0" step="0.5" required />
+              <small>s</small>
+            </label>
+            <label>
+              <span>Sound volume</span>
+              <input data-setting="trainSound.defaultVolume" type="number" min="0" max="100" step="1" required />
+              <small>%</small>
+            </label>
+            <label>
+              <span>Announcement volume</span>
+              <input data-setting="announcement.volume" type="number" min="0" max="100" step="1" required />
+              <small>%</small>
+            </label>
+            <label>
+              <span>Door closing volume</span>
+              <input data-setting="doorClosingSound.volume" type="number" min="0" max="100" step="1" required />
+              <small>%</small>
+            </label>
+            <label>
+              <span>Start volume</span>
+              <input data-setting="startSound.volume" type="number" min="0" max="100" step="1" required />
+              <small>%</small>
+            </label>
+            <label>
+              <span>End volume</span>
+              <input data-setting="endSound.volume" type="number" min="0" max="100" step="1" required />
+              <small>%</small>
+            </label>
+            <label>
+              <span>Max random sounds</span>
+              <input data-setting="trainSound.maxConcurrent" type="number" min="1" step="1" required />
+              <small>max</small>
+            </label>
+          </fieldset>
+        </form>
+
+        <div class="settings-actions">
+          <button class="secondary" id="settingsResetButton" type="button">Reset</button>
+          <button class="primary" type="submit" form="settingsForm">Save</button>
+        </div>
       </section>
 
       <section class="game screen" id="playScreen" aria-label="Train to Bishan game" hidden>

@@ -1,6 +1,7 @@
 const CONFIG_PATH = "config/game-config.json";
 const SCRIPT_CONFIG_GLOBAL = "TRAIN_TO_BISHAN_GAME_CONFIG";
 const DEMO_SKIP_QUERY_VALUE = "true";
+const USER_SETTINGS_STORAGE_KEY = "train-to-bishan:user-settings";
 const DEFAULT_GAME_SETTINGS = {
   routeStations: [
     { code: "NS25", name: "City Hall" },
@@ -112,6 +113,8 @@ let DOOR_CLOSING_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.doorClosingSound };
 let ANNOUNCEMENT_CONFIG = { ...DEFAULT_GAME_SETTINGS.announcement };
 let AUNTIE_CONFIG = { ...DEFAULT_GAME_SETTINGS.auntieEvent };
 let VIBRATION_CONFIG = cloneVibrationConfig(DEFAULT_GAME_SETTINGS.vibration);
+let BASE_GAME_SETTINGS = cloneSettingValue(DEFAULT_GAME_SETTINGS);
+let USER_GAME_SETTINGS = {};
 
 function cloneStations(stations) {
   return stations.map((station) => ({ code: station.code, name: station.name }));
@@ -154,6 +157,49 @@ function cloneVibrationConfig(config) {
     arrival: cloneVibrationPattern(config.arrival),
     rushTap: cloneVibrationPattern(config.rushTap),
   };
+}
+
+function cloneSettingValue(value) {
+  if (Array.isArray(value)) {
+    return value.map(cloneSettingValue);
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nestedValue]) => [key, cloneSettingValue(nestedValue)]),
+    );
+  }
+
+  return value;
+}
+
+function mergeGameSettings(baseSettings, overrideSettings) {
+  if (overrideSettings === undefined) {
+    return cloneSettingValue(baseSettings);
+  }
+
+  if (Array.isArray(overrideSettings)) {
+    return overrideSettings.map(cloneSettingValue);
+  }
+
+  if (
+    overrideSettings &&
+    typeof overrideSettings === "object" &&
+    !Array.isArray(overrideSettings)
+  ) {
+    const mergedSettings =
+      baseSettings && typeof baseSettings === "object" && !Array.isArray(baseSettings)
+        ? cloneSettingValue(baseSettings)
+        : {};
+
+    Object.entries(overrideSettings).forEach(([key, value]) => {
+      mergedSettings[key] = mergeGameSettings(mergedSettings[key], value);
+    });
+
+    return mergedSettings;
+  }
+
+  return overrideSettings;
 }
 
 function readDemoSkipEnabled() {
@@ -237,8 +283,45 @@ function applyGameSettings(settings) {
   });
 }
 
+function loadStoredGameSettings() {
+  try {
+    const rawSettings = window.localStorage?.getItem(USER_SETTINGS_STORAGE_KEY);
+
+    if (!rawSettings) {
+      return {};
+    }
+
+    return readObject(JSON.parse(rawSettings));
+  } catch (error) {
+    console.warn("Could not load saved Train to Bishan settings.", error);
+    return {};
+  }
+}
+
+function saveStoredGameSettings(settings) {
+  try {
+    window.localStorage?.setItem(USER_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  } catch (error) {
+    console.warn("Could not save Train to Bishan settings.", error);
+  }
+}
+
+function clearStoredGameSettings() {
+  try {
+    window.localStorage?.removeItem(USER_SETTINGS_STORAGE_KEY);
+  } catch (error) {
+    console.warn("Could not clear saved Train to Bishan settings.", error);
+  }
+}
+
+function applyCurrentGameSettings() {
+  applyGameSettings(mergeGameSettings(BASE_GAME_SETTINGS, USER_GAME_SETTINGS));
+  resetCountdowns();
+}
+
 async function loadGameSettings() {
   const scriptConfig = readObject(window[SCRIPT_CONFIG_GLOBAL]);
+  let baseSettings = DEFAULT_GAME_SETTINGS;
 
   try {
     const configUrl = new URL(CONFIG_PATH, window.location.href);
@@ -248,24 +331,24 @@ async function loadGameSettings() {
 
     if (!response.ok) {
       if (Object.keys(scriptConfig).length > 0) {
-        applyGameSettings(scriptConfig);
-        return;
+        baseSettings = scriptConfig;
+      } else {
+        console.warn(`Could not load ${CONFIG_PATH}; using built-in defaults.`);
       }
-
-      console.warn(`Could not load ${CONFIG_PATH}; using built-in defaults.`);
-      return;
+    } else {
+      baseSettings = await response.json();
     }
-
-    applyGameSettings(await response.json());
   } catch (error) {
     if (Object.keys(scriptConfig).length > 0) {
-      applyGameSettings(scriptConfig);
-      return;
+      baseSettings = scriptConfig;
+    } else {
+      console.warn(`Could not load ${CONFIG_PATH}; using built-in defaults.`, error);
     }
-
-    console.warn(`Could not load ${CONFIG_PATH}; using built-in defaults.`, error);
-    applyGameSettings(DEFAULT_GAME_SETTINGS);
   }
+
+  BASE_GAME_SETTINGS = cloneSettingValue(baseSettings);
+  USER_GAME_SETTINGS = loadStoredGameSettings();
+  applyCurrentGameSettings();
 }
 
 const gameEl = document.querySelector(".game");
@@ -296,6 +379,14 @@ const stationSignNameEl = document.querySelector(".station-sign span:last-child"
 const successHeadingEl = document.querySelector(".success-copy h2");
 const successStationCodeEl = document.querySelector(".success-copy .line-code");
 const skipButtonEl = document.querySelector("#skipButton");
+const settingsScreenEl = document.querySelector("#settingsScreen");
+const settingsButtonEl = document.querySelector("#settingsButton");
+const settingsBackButtonEl = document.querySelector("#settingsBackButton");
+const settingsFormEl = document.querySelector("#settingsForm");
+const settingsResetButtonEl = document.querySelector("#settingsResetButton");
+const settingsInputEls = Object.fromEntries(
+  [...document.querySelectorAll("[data-setting]")].map((input) => [input.dataset.setting, input]),
+);
 const MAIN_SUBTITLE_HTML =
   "Experience the daily commute of the average Singaporean from the <s>comfort</s> discomfort of your home!";
 const DEMO_SKIP_ENABLED = readDemoSkipEnabled();
@@ -306,6 +397,7 @@ let statusTextClearTimer = null;
 
 const state = {
   phase: "idle",
+  showingSettings: false,
   lastTick: 0,
   arrivalRemaining: DURATIONS.arrival,
   boardingRemaining: DURATIONS.boarding,
@@ -644,6 +736,245 @@ function resetCountdowns() {
   state.arrivalRemaining = DURATIONS.arrival;
   state.boardingRemaining = DURATIONS.boarding;
   state.rideRemaining = DURATIONS.ride;
+}
+
+function msToSeconds(ms) {
+  return Number(ms) / 1000;
+}
+
+function secondsToMs(seconds) {
+  return Math.max(0, Math.round(Number(seconds) * 1000));
+}
+
+function ratioToPercent(ratio) {
+  return Number(ratio) * 100;
+}
+
+function percentToRatio(percent) {
+  return clamp(Number(percent) / 100, 0, 1);
+}
+
+function formatSettingValue(value) {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return "";
+  }
+
+  const roundedValue = Math.round(numericValue * 100) / 100;
+  return Number.isInteger(roundedValue) ? String(roundedValue) : roundedValue.toFixed(2);
+}
+
+function getSettingInput(key) {
+  return settingsInputEls[key] ?? null;
+}
+
+function setSettingInputValue(key, value) {
+  const input = getSettingInput(key);
+
+  if (input) {
+    input.value = formatSettingValue(value);
+  }
+}
+
+function readSettingNumber(key, fallback) {
+  const input = getSettingInput(key);
+  const value = Number(input?.value);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function populateSettingsForm() {
+  setSettingInputValue(
+    "timing.initialTrainArrivalDuration",
+    msToSeconds(GAME_CONFIG.initialTrainArrivalDuration),
+  );
+  setSettingInputValue("timing.boardingDuration", msToSeconds(GAME_CONFIG.boardingDuration));
+  setSettingInputValue(
+    "timing.durationBetweenStations",
+    msToSeconds(GAME_CONFIG.durationBetweenStations),
+  );
+  setSettingInputValue(
+    "timing.stationDwellDuration",
+    msToSeconds(GAME_CONFIG.stationDwellDuration),
+  );
+  setSettingInputValue("seatRush.gainPerPress", ratioToPercent(SEAT_RUSH_CONFIG.gainPerPress));
+  setSettingInputValue(
+    "seatRush.decayPerSecond",
+    ratioToPercent(SEAT_RUSH_CONFIG.decayPerSecond),
+  );
+  setSettingInputValue("seatRush.seatThreshold", ratioToPercent(SEAT_RUSH_CONFIG.seatThreshold));
+  setSettingInputValue("upright.betaMin", UPRIGHT.betaMin);
+  setSettingInputValue("upright.betaMax", UPRIGHT.betaMax);
+  setSettingInputValue("upright.gammaMax", UPRIGHT.gammaMax);
+  setSettingInputValue("upright.checkInterval", UPRIGHT.checkInterval);
+  setSettingInputValue("upright.staleAfter", UPRIGHT.staleAfter);
+  setSettingInputValue("auntieEvent.chance", ratioToPercent(getAuntieChance()));
+  setSettingInputValue("auntieEvent.scoldAfter", msToSeconds(getAuntieScoldAfter()));
+  setSettingInputValue("auntieEvent.minDuration", msToSeconds(AUNTIE_CONFIG.minDuration));
+  setSettingInputValue("auntieEvent.maxDuration", msToSeconds(AUNTIE_CONFIG.maxDuration));
+  setSettingInputValue("auntieEvent.fadeDuration", msToSeconds(getAuntieFadeDuration()));
+  setSettingInputValue(
+    "auntieEvent.eyesOpenThreshold",
+    ratioToPercent(getAuntieEyesOpenThreshold()),
+  );
+  setSettingInputValue("auntieEvent.slideDuration", msToSeconds(getAuntieSlideDuration()));
+  setSettingInputValue("audioFade.duration", msToSeconds(getAudioFadeDuration()));
+  setSettingInputValue("trainSound.minDelay", msToSeconds(TRAIN_SOUND_CONFIG.minDelay));
+  setSettingInputValue("trainSound.maxDelay", msToSeconds(TRAIN_SOUND_CONFIG.maxDelay));
+  setSettingInputValue(
+    "announcement.arrivingLeadTime",
+    msToSeconds(getArrivingLeadTime()),
+  );
+  setSettingInputValue(
+    "doorClosingSound.leadTime",
+    msToSeconds(getDoorClosingLeadTime()),
+  );
+  setSettingInputValue(
+    "trainSound.defaultVolume",
+    ratioToPercent(TRAIN_SOUND_CONFIG.defaultVolume),
+  );
+  setSettingInputValue("announcement.volume", ratioToPercent(ANNOUNCEMENT_CONFIG.volume));
+  setSettingInputValue(
+    "doorClosingSound.volume",
+    ratioToPercent(DOOR_CLOSING_SOUND_CONFIG.volume),
+  );
+  setSettingInputValue("startSound.volume", ratioToPercent(START_SOUND_CONFIG.volume));
+  setSettingInputValue("endSound.volume", ratioToPercent(END_SOUND_CONFIG.volume));
+  setSettingInputValue("trainSound.maxConcurrent", TRAIN_SOUND_CONFIG.maxConcurrent);
+}
+
+function readSettingsForm() {
+  const initialArrivalSeconds = readSettingNumber(
+    "timing.initialTrainArrivalDuration",
+    msToSeconds(GAME_CONFIG.initialTrainArrivalDuration),
+  );
+  const betaMin = readSettingNumber("upright.betaMin", UPRIGHT.betaMin);
+  const betaMax = readSettingNumber("upright.betaMax", UPRIGHT.betaMax);
+  const auntieMinDuration = secondsToMs(
+    readSettingNumber("auntieEvent.minDuration", msToSeconds(AUNTIE_CONFIG.minDuration)),
+  );
+  const auntieMaxDuration = secondsToMs(
+    readSettingNumber("auntieEvent.maxDuration", msToSeconds(AUNTIE_CONFIG.maxDuration)),
+  );
+  const randomSoundMinDelay = secondsToMs(
+    readSettingNumber("trainSound.minDelay", msToSeconds(TRAIN_SOUND_CONFIG.minDelay)),
+  );
+  const randomSoundMaxDelay = secondsToMs(
+    readSettingNumber("trainSound.maxDelay", msToSeconds(TRAIN_SOUND_CONFIG.maxDelay)),
+  );
+
+  return {
+    timing: {
+      initialTrainArrivalDuration: secondsToMs(initialArrivalSeconds),
+      trainArrivalDuration: secondsToMs(initialArrivalSeconds),
+      boardingDuration: secondsToMs(
+        readSettingNumber("timing.boardingDuration", msToSeconds(GAME_CONFIG.boardingDuration)),
+      ),
+      durationBetweenStations: secondsToMs(
+        readSettingNumber(
+          "timing.durationBetweenStations",
+          msToSeconds(GAME_CONFIG.durationBetweenStations),
+        ),
+      ),
+      stationDwellDuration: secondsToMs(
+        readSettingNumber(
+          "timing.stationDwellDuration",
+          msToSeconds(GAME_CONFIG.stationDwellDuration),
+        ),
+      ),
+    },
+    seatRush: {
+      gainPerPress: percentToRatio(
+        readSettingNumber("seatRush.gainPerPress", ratioToPercent(SEAT_RUSH_CONFIG.gainPerPress)),
+      ),
+      decayPerSecond: percentToRatio(
+        readSettingNumber(
+          "seatRush.decayPerSecond",
+          ratioToPercent(SEAT_RUSH_CONFIG.decayPerSecond),
+        ),
+      ),
+      seatThreshold: percentToRatio(
+        readSettingNumber("seatRush.seatThreshold", ratioToPercent(SEAT_RUSH_CONFIG.seatThreshold)),
+      ),
+    },
+    upright: {
+      betaMin: Math.min(betaMin, betaMax),
+      betaMax: Math.max(betaMin, betaMax),
+      gammaMax: readSettingNumber("upright.gammaMax", UPRIGHT.gammaMax),
+      checkInterval: readSettingNumber("upright.checkInterval", UPRIGHT.checkInterval),
+      staleAfter: readSettingNumber("upright.staleAfter", UPRIGHT.staleAfter),
+    },
+    auntieEvent: {
+      chance: percentToRatio(
+        readSettingNumber("auntieEvent.chance", ratioToPercent(getAuntieChance())),
+      ),
+      scoldAfter: secondsToMs(
+        readSettingNumber("auntieEvent.scoldAfter", msToSeconds(getAuntieScoldAfter())),
+      ),
+      minDuration: Math.min(auntieMinDuration, auntieMaxDuration),
+      maxDuration: Math.max(auntieMinDuration, auntieMaxDuration),
+      fadeDuration: secondsToMs(
+        readSettingNumber("auntieEvent.fadeDuration", msToSeconds(getAuntieFadeDuration())),
+      ),
+      eyesOpenThreshold: percentToRatio(
+        readSettingNumber(
+          "auntieEvent.eyesOpenThreshold",
+          ratioToPercent(getAuntieEyesOpenThreshold()),
+        ),
+      ),
+      slideDuration: secondsToMs(
+        readSettingNumber("auntieEvent.slideDuration", msToSeconds(getAuntieSlideDuration())),
+      ),
+    },
+    audioFade: {
+      duration: secondsToMs(
+        readSettingNumber("audioFade.duration", msToSeconds(getAudioFadeDuration())),
+      ),
+    },
+    trainSound: {
+      minDelay: Math.min(randomSoundMinDelay, randomSoundMaxDelay),
+      maxDelay: Math.max(randomSoundMinDelay, randomSoundMaxDelay),
+      defaultVolume: percentToRatio(
+        readSettingNumber(
+          "trainSound.defaultVolume",
+          ratioToPercent(TRAIN_SOUND_CONFIG.defaultVolume),
+        ),
+      ),
+      maxConcurrent: Math.max(
+        1,
+        Math.round(readSettingNumber("trainSound.maxConcurrent", TRAIN_SOUND_CONFIG.maxConcurrent)),
+      ),
+    },
+    announcement: {
+      arrivingLeadTime: secondsToMs(
+        readSettingNumber("announcement.arrivingLeadTime", msToSeconds(getArrivingLeadTime())),
+      ),
+      volume: percentToRatio(
+        readSettingNumber("announcement.volume", ratioToPercent(ANNOUNCEMENT_CONFIG.volume)),
+      ),
+    },
+    doorClosingSound: {
+      leadTime: secondsToMs(
+        readSettingNumber("doorClosingSound.leadTime", msToSeconds(getDoorClosingLeadTime())),
+      ),
+      volume: percentToRatio(
+        readSettingNumber(
+          "doorClosingSound.volume",
+          ratioToPercent(DOOR_CLOSING_SOUND_CONFIG.volume),
+        ),
+      ),
+    },
+    startSound: {
+      volume: percentToRatio(
+        readSettingNumber("startSound.volume", ratioToPercent(START_SOUND_CONFIG.volume)),
+      ),
+    },
+    endSound: {
+      volume: percentToRatio(
+        readSettingNumber("endSound.volume", ratioToPercent(END_SOUND_CONFIG.volume)),
+      ),
+    },
+  };
 }
 
 function clearStatusTextTimers() {
@@ -1698,7 +2029,12 @@ function stopAllAudio(immediate = false) {
 }
 
 function canDemoSkip() {
-  return DEMO_SKIP_ENABLED && state.phase !== "idle" && state.phase !== "arrived";
+  return (
+    DEMO_SKIP_ENABLED &&
+    !state.showingSettings &&
+    state.phase !== "idle" &&
+    state.phase !== "arrived"
+  );
 }
 
 function getNextStationElapsed() {
@@ -1765,6 +2101,50 @@ function skipToNextStation() {
   }
 }
 
+function openSettings() {
+  if (state.phase !== "idle") {
+    return;
+  }
+
+  populateSettingsForm();
+  state.showingSettings = true;
+  render();
+}
+
+function closeSettings() {
+  state.showingSettings = false;
+  render();
+}
+
+function refreshAfterSettingsChange(message) {
+  applyCurrentGameSettings();
+  state.lastActionKey = "none:false";
+  populateSettingsForm();
+  showStatusText(message, "success");
+  render();
+}
+
+function saveSettings(event) {
+  event.preventDefault();
+
+  if (
+    typeof settingsFormEl.reportValidity === "function" &&
+    !settingsFormEl.reportValidity()
+  ) {
+    return;
+  }
+
+  USER_GAME_SETTINGS = readSettingsForm();
+  saveStoredGameSettings(USER_GAME_SETTINGS);
+  refreshAfterSettingsChange("Settings saved.");
+}
+
+function resetSettingsToConfig() {
+  USER_GAME_SETTINGS = {};
+  clearStoredGameSettings();
+  refreshAfterSettingsChange("Settings reset.");
+}
+
 function resetState() {
   hideStatusText(true);
   clearStartSound();
@@ -1773,6 +2153,7 @@ function resetState() {
   stationAnnouncementPlayer.stop();
   doorClosingPlayer.stop();
   state.phase = "idle";
+  state.showingSettings = false;
   state.lastTick = 0;
   resetCountdowns();
   state.seatProgress = 0;
@@ -1796,6 +2177,7 @@ function startWaiting() {
   stationAnnouncementPlayer.stop();
   doorClosingPlayer.stop();
   state.phase = "waiting";
+  state.showingSettings = false;
   state.lastTick = performance.now();
   resetCountdowns();
   state.seatProgress = 0;
@@ -2018,9 +2400,12 @@ function render() {
         state.motionPermission === "granted" &&
         !realMotionIsFresh(now)));
 
-  startScreenEl.hidden = state.phase !== "idle";
-  playScreenEl.hidden = state.phase === "idle" || state.phase === "arrived";
-  successScreenEl.hidden = state.phase !== "arrived";
+  startScreenEl.hidden = state.phase !== "idle" || state.showingSettings;
+  settingsScreenEl.hidden = !state.showingSettings;
+  playScreenEl.hidden =
+    state.showingSettings || state.phase === "idle" || state.phase === "arrived";
+  successScreenEl.hidden = state.showingSettings || state.phase !== "arrived";
+  deviceIndicatorEl.hidden = state.showingSettings;
   gameEl.classList.toggle("paused", paused);
   document.body.classList.toggle("arrival-pulse", state.phase === "boarding");
   trainEl.classList.toggle("arrived", state.phase !== "idle" && state.arrivalRemaining <= 0);
@@ -2123,7 +2508,7 @@ function renderAuntieEvent() {
 }
 
 function renderDemoSkip() {
-  skipButtonEl.hidden = !DEMO_SKIP_ENABLED;
+  skipButtonEl.hidden = !DEMO_SKIP_ENABLED || state.showingSettings;
   skipButtonEl.disabled = !canDemoSkip();
 }
 
@@ -2312,6 +2697,11 @@ startButtonEl.addEventListener("click", async () => {
   await requestMotionAccess();
   startWaiting();
 });
+
+settingsButtonEl.addEventListener("click", openSettings);
+settingsBackButtonEl.addEventListener("click", closeSettings);
+settingsFormEl.addEventListener("submit", saveSettings);
+settingsResetButtonEl.addEventListener("click", resetSettingsToConfig);
 
 actionButtonEl.addEventListener("click", triggerAction);
 
