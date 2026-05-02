@@ -68,7 +68,7 @@ window.TRAIN_TO_BISHAN_GAME_CONFIG = {
     maxConcurrent: 1,
   },
   audioFade: {
-    duration: 1000,
+    duration: 500,
     tickInterval: 50,
   },
   startSound: {

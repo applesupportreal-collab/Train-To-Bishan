@@ -44,7 +44,7 @@ const DEFAULT_GAME_SETTINGS = {
     maxConcurrent: 1,
   },
   audioFade: {
-    duration: 1_000,
+    duration: 500,
     tickInterval: 50,
   },
   startSound: {
