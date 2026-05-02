@@ -17,12 +17,14 @@ Edit `game-config.json` to tune the static game without changing JavaScript.
 - `startSound` is the sound that plays from the Start button tap.
 - `endSound` is the sound that plays when the player reaches Bishan.
 - `auntieSound` is the sound that plays when the auntie appears.
+- `trainDelay.chance` controls the odds that a delay announcement plays at each station stop while the player is standing.
+- `trainDelay.extensionDuration` controls how much extra dwell time a triggered delay adds, in milliseconds.
 - `trainSound.minDelay` and `trainSound.firstMinDelay` are clamped to at least 30000 ms so in-train random sounds stay spaced out.
 - `doorClosingSound.leadTime` controls how many milliseconds before train departure the `doors_are_closing.ogg` clip plays.
 - `announcement.arrivingLeadTime` controls how many milliseconds before each station the `arriving_<station_name>.ogg` clip plays.
 - `auntieEvent.chance` controls the odds that an auntie appears on each departure while the player has a seat.
 - `auntieEvent.minDuration` and `auntieEvent.maxDuration` set how long she stays on screen, in milliseconds.
 - `auntieEvent.scoldAfter` is how long the player can leave the screen undimmed before losing the seat.
-- `seatRush`, `seatOffer`, `upright`, `trainSound`, `announcement`, `auntieEvent`, and `vibration` control the other game mechanics.
+- `seatRush`, `seatOffer`, `trainDelay`, `upright`, `trainSound`, `announcement`, `auntieEvent`, and `vibration` control the other game mechanics.
 
 The app has the same defaults baked into `app.js` as a fallback, so it still starts if the JSON file cannot be loaded.

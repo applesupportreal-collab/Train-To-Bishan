@@ -86,6 +86,12 @@ window.TRAIN_TO_BISHAN_GAME_CONFIG = {
     src: "sounds/auntie.ogg",
     volume: 1,
   },
+  trainDelay: {
+    chance: 0.1,
+    extensionDuration: 15000,
+    src: "sounds/train_delay.ogg",
+    volume: 1,
+  },
   doorClosingSound: {
     src: "sounds/doors_are_closing.ogg",
     volume: 1,

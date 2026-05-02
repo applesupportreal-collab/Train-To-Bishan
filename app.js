@@ -64,6 +64,12 @@ const DEFAULT_GAME_SETTINGS = {
     src: "sounds/auntie.ogg",
     volume: 1,
   },
+  trainDelay: {
+    chance: 0.1,
+    extensionDuration: 15_000,
+    src: "sounds/train_delay.ogg",
+    volume: 1,
+  },
   doorClosingSound: {
     src: "sounds/doors_are_closing.ogg",
     volume: 1,
@@ -119,12 +125,14 @@ let AUDIO_FADE_CONFIG = { ...DEFAULT_GAME_SETTINGS.audioFade };
 let START_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.startSound };
 let END_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.endSound };
 let AUNTIE_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.auntieSound };
+let TRAIN_DELAY_CONFIG = { ...DEFAULT_GAME_SETTINGS.trainDelay };
 let DOOR_CLOSING_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.doorClosingSound };
 let ANNOUNCEMENT_CONFIG = { ...DEFAULT_GAME_SETTINGS.announcement };
 let AUNTIE_CONFIG = { ...DEFAULT_GAME_SETTINGS.auntieEvent };
 let VIBRATION_CONFIG = cloneVibrationConfig(DEFAULT_GAME_SETTINGS.vibration);
 let BASE_GAME_SETTINGS = cloneSettingValue(DEFAULT_GAME_SETTINGS);
 let USER_GAME_SETTINGS = {};
+const dwellDelayExtensions = new Map();
 
 function cloneStations(stations) {
   return stations.map((station) => ({ code: station.code, name: station.name }));
@@ -310,6 +318,10 @@ function applyGameSettings(settings) {
     ...DEFAULT_GAME_SETTINGS.auntieSound,
     ...readObject(externalSettings.auntieSound),
   };
+  TRAIN_DELAY_CONFIG = {
+    ...DEFAULT_GAME_SETTINGS.trainDelay,
+    ...readObject(externalSettings.trainDelay),
+  };
   DOOR_CLOSING_SOUND_CONFIG = {
     ...DEFAULT_GAME_SETTINGS.doorClosingSound,
     ...readObject(externalSettings.doorClosingSound),
@@ -455,6 +467,7 @@ const state = {
   nextStationAnnouncementsPlayed: new Set(),
   arrivingAnnouncementsPlayed: new Set(),
   doorClosingAnnouncementsPlayed: new Set(),
+  trainDelayStationsChecked: new Set(),
   auntieDeparturesChecked: new Set(),
   auntieActive: false,
   auntieSide: "left",
@@ -499,11 +512,31 @@ function getStationDurations() {
   });
 }
 
+function getDwellDelayKey(index) {
+  const station = ROUTE_STATIONS[index + 1] ?? getDestinationStation();
+  return getStationAnnouncementKey(station, "train-delay", index);
+}
+
+function getDwellDelayExtension(index) {
+  const extension = Number(dwellDelayExtensions.get(getDwellDelayKey(index)) ?? 0);
+  return Number.isFinite(extension) && extension > 0 ? extension : 0;
+}
+
+function getDwellDuration(index) {
+  return GAME_CONFIG.stationDwellDuration + getDwellDelayExtension(index);
+}
+
+function clearDwellDelayExtensions() {
+  dwellDelayExtensions.clear();
+}
+
 function getRideDuration() {
   const stationDurations = getStationDurations();
-  const dwellCount = Math.max(0, stationDurations.length - 1);
   const travelDuration = stationDurations.reduce((total, duration) => total + duration, 0);
-  return travelDuration + dwellCount * GAME_CONFIG.stationDwellDuration;
+  const dwellDuration = stationDurations
+    .slice(0, -1)
+    .reduce((total, _, index) => total + getDwellDuration(index), 0);
+  return travelDuration + dwellDuration;
 }
 
 function getRideElapsed() {
@@ -538,7 +571,7 @@ function getStationSegment() {
     elapsed -= duration;
 
     if (index < stationDurations.length - 1) {
-      const dwellDuration = GAME_CONFIG.stationDwellDuration;
+      const dwellDuration = getDwellDuration(index);
 
       if (elapsed < dwellDuration) {
         return {
@@ -578,6 +611,20 @@ function getSeatOfferChance() {
   const configuredChance = Number(SEAT_OFFER_CONFIG.chance);
   const fallbackChance = DEFAULT_GAME_SETTINGS.seatOffer.chance;
   return Number.isFinite(configuredChance) ? clamp(configuredChance, 0, 1) : fallbackChance;
+}
+
+function getTrainDelayChance() {
+  const configuredChance = Number(TRAIN_DELAY_CONFIG.chance);
+  const fallbackChance = DEFAULT_GAME_SETTINGS.trainDelay.chance;
+  return Number.isFinite(configuredChance) ? clamp(configuredChance, 0, 1) : fallbackChance;
+}
+
+function getTrainDelayExtensionDuration() {
+  const configuredDuration = Number(TRAIN_DELAY_CONFIG.extensionDuration);
+  const fallbackDuration = DEFAULT_GAME_SETTINGS.trainDelay.extensionDuration;
+  return Number.isFinite(configuredDuration) && configuredDuration >= 0
+    ? configuredDuration
+    : fallbackDuration;
 }
 
 function getAuntieChance() {
@@ -756,6 +803,49 @@ function stopPretendSleep() {
 function isSleepActionActive() {
   const action = getActionState();
   return action.enabled && action.type === "sleep";
+}
+
+function extendStationDwell(stationSegment, extensionDuration) {
+  const extension = Number(extensionDuration);
+
+  if (!Number.isFinite(extension) || extension <= 0) {
+    return;
+  }
+
+  const key = getDwellDelayKey(stationSegment.legIndex);
+  const currentExtension = getDwellDelayExtension(stationSegment.legIndex);
+  dwellDelayExtensions.set(key, currentExtension + extension);
+  state.rideRemaining += extension;
+}
+
+function maybeStartTrainDelay(stationSegment) {
+  if (
+    state.phase !== "riding" ||
+    state.seated ||
+    stationSegment.mode !== "dwell"
+  ) {
+    return false;
+  }
+
+  const key = getStationAnnouncementKey(
+    stationSegment.current,
+    "train-delay",
+    stationSegment.legIndex,
+  );
+
+  if (state.trainDelayStationsChecked.has(key)) {
+    return false;
+  }
+
+  state.trainDelayStationsChecked.add(key);
+
+  if (Math.random() >= getTrainDelayChance()) {
+    return false;
+  }
+
+  extendStationDwell(stationSegment, getTrainDelayExtensionDuration());
+  playTrainDelaySound();
+  return true;
 }
 
 function resetStationSeatOffer() {
@@ -989,6 +1079,12 @@ function populateSettingsForm() {
   setSettingInputValue("startSound.volume", ratioToPercent(START_SOUND_CONFIG.volume));
   setSettingInputValue("endSound.volume", ratioToPercent(END_SOUND_CONFIG.volume));
   setSettingInputValue("auntieSound.volume", ratioToPercent(AUNTIE_SOUND_CONFIG.volume));
+  setSettingInputValue("trainDelay.chance", ratioToPercent(getTrainDelayChance()));
+  setSettingInputValue(
+    "trainDelay.extensionDuration",
+    msToSeconds(getTrainDelayExtensionDuration()),
+  );
+  setSettingInputValue("trainDelay.volume", ratioToPercent(TRAIN_DELAY_CONFIG.volume));
   setSettingInputValue("trainSound.maxConcurrent", TRAIN_SOUND_CONFIG.maxConcurrent);
 }
 
@@ -1131,6 +1227,20 @@ function readSettingsForm() {
     auntieSound: {
       volume: percentToRatio(
         readSettingNumber("auntieSound.volume", ratioToPercent(AUNTIE_SOUND_CONFIG.volume)),
+      ),
+    },
+    trainDelay: {
+      chance: percentToRatio(
+        readSettingNumber("trainDelay.chance", ratioToPercent(getTrainDelayChance())),
+      ),
+      extensionDuration: secondsToMs(
+        readSettingNumber(
+          "trainDelay.extensionDuration",
+          msToSeconds(getTrainDelayExtensionDuration()),
+        ),
+      ),
+      volume: percentToRatio(
+        readSettingNumber("trainDelay.volume", ratioToPercent(TRAIN_DELAY_CONFIG.volume)),
       ),
     },
   };
@@ -1414,6 +1524,7 @@ function getTrainSoundEffects() {
 let activeStartSound = null;
 let activeEndSound = null;
 let activeAuntieSound = null;
+let activeTrainDelaySound = null;
 
 function clearStartSound(immediate = false) {
   if (!activeStartSound) {
@@ -1454,6 +1565,22 @@ function clearAuntieSound(immediate = false) {
 
   const audio = activeAuntieSound;
   activeAuntieSound = null;
+
+  if (immediate) {
+    disposeAudio(audio);
+    return;
+  }
+
+  stopAudioWithFade(audio, () => disposeAudio(audio));
+}
+
+function clearTrainDelaySound(immediate = false) {
+  if (!activeTrainDelaySound) {
+    return;
+  }
+
+  const audio = activeTrainDelaySound;
+  activeTrainDelaySound = null;
 
   if (immediate) {
     disposeAudio(audio);
@@ -1600,6 +1727,97 @@ function unlockAuntieSound() {
       .catch((error) => {
         disposeAudio(primer);
         logSoundDebug("Auntie sound unlock failed.", {
+          src,
+          error: error?.message ?? String(error),
+        });
+      });
+  } else {
+    disposeAudio(primer);
+  }
+}
+
+function playTrainDelaySound() {
+  const src = typeof TRAIN_DELAY_CONFIG.src === "string" ? TRAIN_DELAY_CONFIG.src.trim() : "";
+
+  if (!src) {
+    logSoundDebug("Train delay sound skipped; no source configured.");
+    return;
+  }
+
+  clearTrainDelaySound();
+  logSoundDebug("Playing train delay sound.", { src });
+
+  const audio = new Audio(src);
+  const targetVolume = prepareAudioForPlayback(audio, TRAIN_DELAY_CONFIG.volume ?? 1);
+  audio.preload = "auto";
+  audio.playsInline = true;
+  activeTrainDelaySound = audio;
+
+  audio.addEventListener("ended", () => {
+    if (activeTrainDelaySound === audio) {
+      activeTrainDelaySound = null;
+    }
+
+    disposeAudio(audio);
+  });
+
+  audio.addEventListener("error", () => {
+    if (activeTrainDelaySound === audio) {
+      activeTrainDelaySound = null;
+    }
+
+    disposeAudio(audio);
+    logSoundDebug("Train delay sound failed to load.", { src });
+  });
+
+  const playAttempt = audio.play();
+
+  if (playAttempt) {
+    playAttempt
+      .then(() => {
+        startAudioFades(audio, targetVolume);
+        logSoundDebug("Train delay sound playback started.", { src });
+      })
+      .catch((error) => {
+        logSoundDebug("Train delay sound playback was blocked or failed.", {
+          src,
+          error: error?.message ?? String(error),
+        });
+        if (activeTrainDelaySound === audio) {
+          activeTrainDelaySound = null;
+        }
+        disposeAudio(audio);
+      });
+  }
+}
+
+function unlockTrainDelaySound() {
+  const src = typeof TRAIN_DELAY_CONFIG.src === "string" ? TRAIN_DELAY_CONFIG.src.trim() : "";
+
+  if (!src) {
+    logSoundDebug("Train delay sound unlock skipped; no source configured.");
+    return;
+  }
+
+  const primer = new Audio(src);
+  primer.volume = 0;
+  primer.muted = true;
+  primer.preload = "auto";
+  primer.playsInline = true;
+
+  const playAttempt = primer.play();
+
+  if (playAttempt) {
+    playAttempt
+      .then(() => {
+        primer.pause();
+        primer.currentTime = 0;
+        disposeAudio(primer);
+        logSoundDebug("Train delay sound unlocked.", { src });
+      })
+      .catch((error) => {
+        disposeAudio(primer);
+        logSoundDebug("Train delay sound unlock failed.", {
           src,
           error: error?.message ?? String(error),
         });
@@ -2287,6 +2505,7 @@ function stopAllAudio(immediate = false) {
   clearStartSound(immediate);
   clearEndSound(immediate);
   clearAuntieSound(immediate);
+  clearTrainDelaySound(immediate);
   trainSoundscape.stop(immediate);
   stationAnnouncementPlayer.stop(immediate);
   doorClosingPlayer.stop(immediate);
@@ -2332,7 +2551,13 @@ function skipRidingToNextStation() {
     return;
   }
 
-  maybeStartStationSeatOffer(getStationSegment());
+  let stationSegment = getStationSegment();
+
+  if (maybeStartTrainDelay(stationSegment)) {
+    stationSegment = getStationSegment();
+  }
+
+  maybeStartStationSeatOffer(stationSegment);
   trainSoundscape.start(performance.now());
   render();
 }
@@ -2416,12 +2641,14 @@ function resetState() {
   clearStartSound();
   clearEndSound();
   clearAuntieSound();
+  clearTrainDelaySound();
   trainSoundscape.stop();
   stationAnnouncementPlayer.stop();
   doorClosingPlayer.stop();
   state.phase = "idle";
   state.showingSettings = false;
   state.lastTick = 0;
+  clearDwellDelayExtensions();
   resetCountdowns();
   state.seatProgress = 0;
   clearStationSeatOffer();
@@ -2429,6 +2656,7 @@ function resetState() {
   state.nextStationAnnouncementsPlayed = new Set();
   state.arrivingAnnouncementsPlayed = new Set();
   state.doorClosingAnnouncementsPlayed = new Set();
+  state.trainDelayStationsChecked = new Set();
   state.seatOfferStationsChecked = new Set();
   state.auntieDeparturesChecked = new Set();
   resetAuntieEvent();
@@ -2443,12 +2671,14 @@ function startWaiting() {
   hideStatusText(true);
   clearEndSound();
   clearAuntieSound();
+  clearTrainDelaySound();
   trainSoundscape.stop();
   stationAnnouncementPlayer.stop();
   doorClosingPlayer.stop();
   state.phase = "waiting";
   state.showingSettings = false;
   state.lastTick = performance.now();
+  clearDwellDelayExtensions();
   resetCountdowns();
   state.seatProgress = 0;
   clearStationSeatOffer();
@@ -2456,6 +2686,7 @@ function startWaiting() {
   state.nextStationAnnouncementsPlayed = new Set();
   state.arrivingAnnouncementsPlayed = new Set();
   state.doorClosingAnnouncementsPlayed = new Set();
+  state.trainDelayStationsChecked = new Set();
   state.seatOfferStationsChecked = new Set();
   state.auntieDeparturesChecked = new Set();
   resetAuntieEvent();
@@ -2478,10 +2709,12 @@ function startBoarding() {
 function startRide(seated) {
   state.phase = "riding";
   state.seated = seated;
+  clearDwellDelayExtensions();
   state.rideRemaining = DURATIONS.ride;
   state.nextStationAnnouncementsPlayed = new Set();
   state.arrivingAnnouncementsPlayed = new Set();
   state.doorClosingAnnouncementsPlayed = new Set();
+  state.trainDelayStationsChecked = new Set();
   state.seatOfferStationsChecked = new Set();
   clearStationSeatOffer();
   state.auntieDeparturesChecked = new Set();
@@ -2501,6 +2734,7 @@ function finishRide() {
   resetAuntieEvent();
   clearStationSeatOffer();
   clearAuntieSound();
+  clearTrainDelaySound();
   trainSoundscape.stop();
   state.phase = "arrived";
   state.rideRemaining = 0;
@@ -2658,7 +2892,12 @@ function tick(now) {
       }
     } else if (state.phase === "riding") {
       state.rideRemaining -= elapsed;
-      const stationSegment = getStationSegment();
+      let stationSegment = getStationSegment();
+
+      if (maybeStartTrainDelay(stationSegment)) {
+        stationSegment = getStationSegment();
+      }
+
       maybeStartStationSeatOffer(stationSegment);
       updateStationSeatOffer(elapsed, stationSegment);
       playDueNextStationAnnouncement();
@@ -2996,6 +3235,7 @@ function renderActions() {
 startButtonEl.addEventListener("click", async () => {
   playStartSound();
   unlockAuntieSound();
+  unlockTrainDelaySound();
   stationAnnouncementPlayer.unlock();
   doorClosingPlayer.unlock();
   trainSoundscape.unlock();
