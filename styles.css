@@ -318,6 +318,7 @@ button {
 }
 
 .game {
+  position: relative;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   height: 100%;
@@ -919,19 +920,20 @@ button {
   text-decoration: underline;
 }
 
-.paused .scene::after {
+.game.paused::after {
   position: absolute;
   inset: 0;
-  z-index: 10;
+  z-index: 80;
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(23, 32, 38, 0.54);
+  background: rgba(23, 32, 38, 0.68);
   color: white;
-  content: "Phone is not being held upright";
+  content: "Phone is not being held upright!";
   font-size: clamp(1.5rem, 8vw, 3rem);
   font-weight: 900;
   text-align: center;
+  pointer-events: none;
 }
 
 .arrival-pulse .station-sign {

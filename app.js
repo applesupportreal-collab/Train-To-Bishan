@@ -26,10 +26,11 @@ const DEFAULT_GAME_SETTINGS = {
     seatThreshold: 0.95,
   },
   upright: {
-    betaMin: 52,
-    betaMax: 128,
-    gammaMax: 38,
+    betaMin: 48,
+    betaMax: 132,
+    gammaMax: 42,
     staleAfter: 1600,
+    checkInterval: 300,
   },
   trainSound: {
     minDelay: 3_500,
@@ -300,6 +301,10 @@ const state = {
     beta: null,
     gamma: null,
     seenAt: 0,
+  },
+  uprightCheck: {
+    checkedAt: Number.NEGATIVE_INFINITY,
+    upright: true,
   },
 };
 
@@ -1262,6 +1267,14 @@ function realMotionIsFresh(now = performance.now()) {
   );
 }
 
+function getUprightCheckInterval() {
+  const configuredInterval = Number(UPRIGHT.checkInterval);
+  const fallbackInterval = DEFAULT_GAME_SETTINGS.upright.checkInterval;
+  return Number.isFinite(configuredInterval) && configuredInterval >= 0
+    ? configuredInterval
+    : fallbackInterval;
+}
+
 function isRealUpright(now = performance.now()) {
   if (!realMotionIsFresh(now)) {
     return false;
@@ -1281,7 +1294,13 @@ function isPhoneUpright(now = performance.now()) {
     return state.simulatedUpright;
   }
 
-  return isRealUpright(now);
+  if (now - state.uprightCheck.checkedAt < getUprightCheckInterval()) {
+    return state.uprightCheck.upright;
+  }
+
+  state.uprightCheck.checkedAt = now;
+  state.uprightCheck.upright = isRealUpright(now);
+  return state.uprightCheck.upright;
 }
 
 function phaseNeedsUpright() {
@@ -1359,6 +1378,8 @@ function resetState() {
   resetAuntieEvent();
   state.lastActionKey = "none:false";
   state.simulatedUpright = true;
+  state.uprightCheck.checkedAt = Number.NEGATIVE_INFINITY;
+  state.uprightCheck.upright = true;
   render();
 }
 
@@ -1378,6 +1399,8 @@ function startWaiting() {
   state.auntieDeparturesChecked = new Set();
   resetAuntieEvent();
   state.lastActionKey = "none:false";
+  state.uprightCheck.checkedAt = Number.NEGATIVE_INFINITY;
+  state.uprightCheck.upright = true;
   requestAnimationFrame(tick);
   render();
 }
@@ -1705,7 +1728,7 @@ function renderPhaseCopy(paused, upright) {
 
   if (paused) {
     statusRibbonEl.textContent = "Timer paused";
-    messageEl.textContent = "Phone is not being held upright.";
+    messageEl.textContent = "Phone is not being held upright!";
     return;
   }
 

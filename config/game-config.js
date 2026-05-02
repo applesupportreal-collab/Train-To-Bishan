@@ -51,10 +51,11 @@ window.TRAIN_TO_BISHAN_GAME_CONFIG = {
     seatThreshold: 0.95,
   },
   upright: {
-    betaMin: 52,
-    betaMax: 128,
-    gammaMax: 38,
+    betaMin: 48,
+    betaMax: 132,
+    gammaMax: 42,
     staleAfter: 1600,
+    checkInterval: 300,
   },
   trainSound: {
     minDelay: 3500,
