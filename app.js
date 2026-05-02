@@ -524,8 +524,6 @@ function playStartSound() {
     if (activeStartSound === audio) {
       activeStartSound = null;
     }
-
-    logSoundDebug("Start sound ended.", { src });
   });
 
   audio.addEventListener("error", () => {
@@ -637,8 +635,6 @@ function createDoorClosingSoundPlayer() {
         if (activeAudio === audio) {
           activeAudio = null;
         }
-
-        logSoundDebug("Door closing sound ended.", { src: getSrc() });
       });
 
       audio.addEventListener("error", () => {
@@ -781,11 +777,6 @@ function createStationAnnouncementPlayer() {
 
       audio.addEventListener("ended", () => {
         clearAudio(audio);
-        logSoundDebug("Station announcement ended.", {
-          type,
-          station: station.name,
-          src,
-        });
       });
 
       audio.addEventListener("error", () => {
@@ -985,7 +976,6 @@ function createTrainSoundscape() {
         "ended",
         () => {
           clearAudio(audio);
-          logSoundDebug("Random train sound ended.", { src });
         },
         { once: true },
       );
