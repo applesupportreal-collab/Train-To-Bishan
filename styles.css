@@ -390,6 +390,46 @@ button {
   background: var(--red);
 }
 
+.status-text {
+  position: absolute;
+  top: max(74px, calc(env(safe-area-inset-top) + 68px));
+  left: 50%;
+  z-index: 60;
+  width: min(calc(100% - 32px), 380px);
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: rgba(23, 32, 38, 0.94);
+  color: #fffdf6;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1.25;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -12px);
+  transition:
+    opacity 420ms ease,
+    transform 420ms ease;
+}
+
+.status-text.success {
+  background: rgba(22, 128, 96, 0.96);
+}
+
+.status-text.danger {
+  background: rgba(207, 36, 52, 0.96);
+}
+
+.status-text.visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.status-text[hidden] {
+  display: none;
+}
+
 .train {
   position: absolute;
   right: 50%;

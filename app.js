@@ -232,6 +232,7 @@ const trainInteriorEl = document.querySelector("#trainInterior");
 const statusRibbonEl = document.querySelector("#statusRibbon");
 const metersEl = document.querySelector("#meters");
 const primaryMeterEl = document.querySelector("#primaryMeter");
+const statusTextEl = document.querySelector("#statusText");
 const deviceIndicatorEl = document.querySelector("#deviceIndicator");
 const currentStationNameEl = document.querySelector("#currentStationName");
 const nextStationNameEl = document.querySelector("#nextStationName");
@@ -248,6 +249,10 @@ const stationSignCodeEl = document.querySelector(".station-sign .line-code");
 const stationSignNameEl = document.querySelector(".station-sign span:last-child");
 const successHeadingEl = document.querySelector(".success-copy h2");
 const successStationCodeEl = document.querySelector(".success-copy .line-code");
+const STATUS_TEXT_DURATION = 5_000;
+const STATUS_TEXT_FADE_DURATION = 420;
+let statusTextHideTimer = null;
+let statusTextClearTimer = null;
 
 const state = {
   phase: "idle",
@@ -395,6 +400,49 @@ function resetCountdowns() {
   state.arrivalRemaining = DURATIONS.arrival;
   state.boardingRemaining = DURATIONS.boarding;
   state.rideRemaining = DURATIONS.ride;
+}
+
+function clearStatusTextTimers() {
+  window.clearTimeout(statusTextHideTimer);
+  window.clearTimeout(statusTextClearTimer);
+  statusTextHideTimer = null;
+  statusTextClearTimer = null;
+}
+
+function hideStatusText(immediate = false) {
+  clearStatusTextTimers();
+  statusTextEl.classList.remove("visible");
+
+  if (immediate) {
+    statusTextEl.hidden = true;
+    statusTextEl.textContent = "";
+    statusTextEl.classList.remove("success", "danger");
+    return;
+  }
+
+  statusTextClearTimer = window.setTimeout(() => {
+    statusTextEl.hidden = true;
+    statusTextEl.textContent = "";
+    statusTextEl.classList.remove("success", "danger");
+    statusTextClearTimer = null;
+  }, STATUS_TEXT_FADE_DURATION);
+}
+
+function showStatusText(message, tone) {
+  clearStatusTextTimers();
+  statusTextEl.textContent = message;
+  statusTextEl.hidden = false;
+  statusTextEl.classList.toggle("success", tone === "success");
+  statusTextEl.classList.toggle("danger", tone === "danger");
+
+  window.requestAnimationFrame(() => {
+    statusTextEl.classList.add("visible");
+  });
+
+  statusTextHideTimer = window.setTimeout(() => {
+    statusTextHideTimer = null;
+    hideStatusText();
+  }, STATUS_TEXT_DURATION);
 }
 
 function clampVolume(volume) {
@@ -1101,6 +1149,7 @@ function handleOrientation(event) {
 }
 
 function resetState() {
+  hideStatusText(true);
   clearStartSound();
   trainSoundscape.stop();
   stationAnnouncementPlayer.stop();
@@ -1119,6 +1168,7 @@ function resetState() {
 }
 
 function startWaiting() {
+  hideStatusText(true);
   trainSoundscape.stop();
   stationAnnouncementPlayer.stop();
   doorClosingPlayer.stop();
@@ -1153,10 +1203,15 @@ function startRide(seated) {
   playDueNextStationAnnouncement();
   trainSoundscape.start();
   vibrate(seated ? VIBRATION_CONFIG.seated : VIBRATION_CONFIG.standing);
+  showStatusText(
+    seated ? "Seat secured!" : "Failed to get a seat! Standing it shall be...",
+    seated ? "success" : "danger",
+  );
   render();
 }
 
 function finishRide() {
+  hideStatusText(true);
   trainSoundscape.stop();
   state.phase = "arrived";
   state.rideRemaining = 0;
@@ -1339,8 +1394,7 @@ function render() {
   trainEl.classList.toggle("boarding", state.phase === "boarding");
   queueEl.classList.toggle("hidden", state.phase === "riding" || state.phase === "arrived");
   trainInteriorEl.hidden = state.phase !== "riding" && state.phase !== "arrived";
-  statusRibbonEl.classList.toggle("success", state.phase === "riding" && state.seated);
-  statusRibbonEl.classList.toggle("danger", state.phase === "riding" && !state.seated);
+  statusRibbonEl.classList.remove("success", "danger");
 
   sensorFallbackEl.hidden = !needsMotionFallback;
   sensorFallbackEl.textContent = state.simulatedUpright ? "Simulated upright" : "Simulated tilted";
@@ -1423,13 +1477,13 @@ function renderPhaseCopy(paused, upright) {
   }
 
   if (state.phase === "riding" && state.seated) {
-    statusRibbonEl.textContent = "Seat secured!";
+    statusRibbonEl.textContent = `On board to ${destination.name}`;
     messageEl.textContent = "You can rest the phone while the ride continues.";
     return;
   }
 
   if (state.phase === "riding") {
-    statusRibbonEl.textContent = "Failed to get a seat! Standing it shall be...";
+    statusRibbonEl.textContent = `On board to ${destination.name}`;
     messageEl.textContent = usesUprightCheck
       ? `Keep the phone upright until ${destination.name}.`
       : `Ride it out standing until ${destination.name}.`;
