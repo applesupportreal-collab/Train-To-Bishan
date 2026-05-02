@@ -95,7 +95,7 @@
   },
   "auntieEvent": {
     "chance": 0.2,
-    "imageSrc": "assets/auntie-placeholder.svg",
+    "imageSrc": "assets/auntie.png",
     "scoldAfter": 3000,
     "minDuration": 20000,
     "maxDuration": 30000,

@@ -73,7 +73,7 @@ const DEFAULT_GAME_SETTINGS = {
   },
   auntieEvent: {
     chance: 0.2,
-    imageSrc: "assets/auntie-placeholder.svg",
+    imageSrc: "assets/auntie.png",
     scoldAfter: 3_000,
     minDuration: 20_000,
     maxDuration: 30_000,
