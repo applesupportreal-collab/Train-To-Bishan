@@ -29,7 +29,7 @@ const DURATIONS = {
 };
 const SEAT_RUSH_CONFIG = {
   gainPerPress: 0.08,
-  decayPerSecond: 0.08,
+  decayPerSecond: 0.16,
   seatThreshold: 0.95,
 };
 const UPRIGHT = {
