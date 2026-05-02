@@ -20,8 +20,15 @@ Next-station announcements use this filename format:
 next_station_<station_name>.ogg
 ```
 
+Arriving announcements use this filename format:
+
+```text
+arriving_<station_name>.ogg
+```
+
 Station names are lowercase with spaces replaced by underscores. For example:
 
 ```text
 next_station_dhoby_ghaut.ogg
+arriving_somerset.ogg
 ```

@@ -72,8 +72,11 @@
   "announcement": {
     "basePath": "sounds",
     "prefix": "next_station",
+    "nextStationPrefix": "next_station",
+    "arrivingPrefix": "arriving",
     "extension": "ogg",
-    "volume": 1
+    "volume": 1,
+    "arrivingLeadTime": 10000
   },
   "vibration": {
     "actionActivation": [

@@ -46,8 +46,11 @@ const DEFAULT_GAME_SETTINGS = {
   announcement: {
     basePath: "sounds",
     prefix: "next_station",
+    nextStationPrefix: "next_station",
+    arrivingPrefix: "arriving",
     extension: "ogg",
     volume: 1,
+    arrivingLeadTime: 10_000,
   },
   vibration: {
     actionActivation: [35, 25, 35],
@@ -211,6 +214,7 @@ const state = {
   rideRemaining: DURATIONS.ride,
   seatProgress: 0,
   seated: false,
+  arrivingAnnouncementsPlayed: new Set(),
   lastActionKey: "none:false",
   motionPermission: "unknown",
   usingSimulatedMotion: false,
@@ -264,6 +268,8 @@ function getStationSegment() {
 
     if (elapsed < duration) {
       return {
+        mode: "travel",
+        legIndex: index,
         current: ROUTE_STATIONS[index],
         next: ROUTE_STATIONS[index + 1],
         progress: duration > 0 ? elapsed / duration : 1,
@@ -278,6 +284,8 @@ function getStationSegment() {
 
       if (elapsed < dwellDuration) {
         return {
+          mode: "dwell",
+          legIndex: index,
           current: ROUTE_STATIONS[index + 1],
           next: ROUTE_STATIONS[index + 2],
           progress: 0,
@@ -291,6 +299,8 @@ function getStationSegment() {
 
   const finalStationIndex = ROUTE_STATIONS.length - 1;
   return {
+    mode: "arrived",
+    legIndex: Math.max(0, finalStationIndex - 1),
     current: ROUTE_STATIONS[Math.max(0, finalStationIndex - 1)],
     next: ROUTE_STATIONS[finalStationIndex],
     progress: 1,
@@ -316,6 +326,17 @@ function getDestinationStation() {
 
 function getFirstNextStation() {
   return ROUTE_STATIONS[1] ?? getDestinationStation();
+}
+
+function getArrivingLeadTime() {
+  const configuredLeadTime = Number(ANNOUNCEMENT_CONFIG.arrivingLeadTime);
+  return Number.isFinite(configuredLeadTime) && configuredLeadTime >= 0
+    ? configuredLeadTime
+    : DEFAULT_GAME_SETTINGS.announcement.arrivingLeadTime;
+}
+
+function getStationAnnouncementKey(station, type, legIndex = "") {
+  return `${type}:${legIndex}:${station.code}:${station.name}`;
 }
 
 function resetCountdowns() {
@@ -419,28 +440,33 @@ function getStationAudioSlug(stationName) {
     .replace(/^_+|_+$/g, "");
 }
 
-function getNextStationAnnouncementSrc(station) {
+function getAnnouncementPrefix(type) {
+  if (type === "arriving") {
+    return ANNOUNCEMENT_CONFIG.arrivingPrefix ?? "arriving";
+  }
+
+  return ANNOUNCEMENT_CONFIG.nextStationPrefix ?? ANNOUNCEMENT_CONFIG.prefix ?? "next_station";
+}
+
+function getStationAnnouncementSrc(station, type) {
   const slug = getStationAudioSlug(station.name);
-  return `${ANNOUNCEMENT_CONFIG.basePath}/${ANNOUNCEMENT_CONFIG.prefix}_${slug}.${ANNOUNCEMENT_CONFIG.extension}`;
+  const prefix = getAnnouncementPrefix(type);
+  return `${ANNOUNCEMENT_CONFIG.basePath}/${prefix}_${slug}.${ANNOUNCEMENT_CONFIG.extension}`;
 }
 
 function createStationAnnouncementPlayer() {
-  let pendingStation = null;
-  let activeAudio = null;
+  let pendingAnnouncement = null;
+  const activeAudio = new Set();
 
-  function clearActiveAudio() {
-    if (!activeAudio) {
-      return;
-    }
-
-    activeAudio.pause();
-    activeAudio.removeAttribute("src");
-    activeAudio.load();
-    activeAudio = null;
+  function clearAudio(audio) {
+    audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
+    activeAudio.delete(audio);
   }
 
-  function createAudio(station, muted = false) {
-    const audio = new Audio(getNextStationAnnouncementSrc(station));
+  function createAudio(station, type, muted = false) {
+    const audio = new Audio(getStationAnnouncementSrc(station, type));
     audio.volume = muted ? 0 : clampVolume(ANNOUNCEMENT_CONFIG.volume);
     audio.muted = muted;
     audio.preload = "auto";
@@ -448,10 +474,14 @@ function createStationAnnouncementPlayer() {
     return audio;
   }
 
+  function isPending(station, type) {
+    return pendingAnnouncement?.station === station && pendingAnnouncement?.type === type;
+  }
+
   return {
     blocked: false,
     unlock() {
-      const primer = createAudio(getFirstNextStation(), true);
+      const primer = createAudio(getFirstNextStation(), "next", true);
       const playAttempt = primer.play();
 
       if (playAttempt) {
@@ -464,28 +494,28 @@ function createStationAnnouncementPlayer() {
       }
     },
     stop() {
-      pendingStation = null;
+      pendingAnnouncement = null;
       this.blocked = false;
-      clearActiveAudio();
+      activeAudio.forEach(clearAudio);
+      activeAudio.clear();
     },
-    playNextStation(station) {
-      pendingStation = station;
+    playStationAnnouncement(station, type) {
+      pendingAnnouncement = { station, type };
       this.blocked = false;
-      clearActiveAudio();
 
-      const audio = createAudio(station);
-      activeAudio = audio;
+      const audio = createAudio(station, type);
+      activeAudio.add(audio);
 
       audio.addEventListener("ended", () => {
-        if (activeAudio === audio) {
-          activeAudio = null;
-        }
+        clearAudio(audio);
       });
 
       audio.addEventListener("error", () => {
-        if (activeAudio === audio) {
-          activeAudio = null;
+        if (isPending(station, type)) {
+          pendingAnnouncement = null;
         }
+
+        clearAudio(audio);
       });
 
       const playAttempt = audio.play();
@@ -493,20 +523,33 @@ function createStationAnnouncementPlayer() {
       if (playAttempt) {
         playAttempt
           .then(() => {
-            pendingStation = null;
+            if (isPending(station, type)) {
+              pendingAnnouncement = null;
+            }
           })
-          .catch(() => {
-            this.blocked = true;
-            clearActiveAudio();
-            render();
+          .catch((error) => {
+            clearAudio(audio);
+
+            if (error?.name === "NotAllowedError") {
+              this.blocked = true;
+              render();
+            } else if (isPending(station, type)) {
+              pendingAnnouncement = null;
+            }
           });
       }
+    },
+    playNextStation(station) {
+      this.playStationAnnouncement(station, "next");
+    },
+    playArrivingAtStation(station) {
+      this.playStationAnnouncement(station, "arriving");
     },
     enableFromGesture() {
       this.blocked = false;
 
-      if (pendingStation) {
-        this.playNextStation(pendingStation);
+      if (pendingAnnouncement) {
+        this.playStationAnnouncement(pendingAnnouncement.station, pendingAnnouncement.type);
       } else {
         this.unlock();
       }
@@ -765,6 +808,7 @@ function resetState() {
   resetCountdowns();
   state.seatProgress = 0;
   state.seated = false;
+  state.arrivingAnnouncementsPlayed = new Set();
   state.lastActionKey = "none:false";
   state.simulatedUpright = true;
   render();
@@ -778,6 +822,7 @@ function startWaiting() {
   resetCountdowns();
   state.seatProgress = 0;
   state.seated = false;
+  state.arrivingAnnouncementsPlayed = new Set();
   state.lastActionKey = "none:false";
   requestAnimationFrame(tick);
   render();
@@ -795,6 +840,7 @@ function startRide(seated) {
   state.phase = "riding";
   state.seated = seated;
   state.rideRemaining = DURATIONS.ride;
+  state.arrivingAnnouncementsPlayed = new Set();
   stationAnnouncementPlayer.playNextStation(getFirstNextStation());
   trainSoundscape.start();
   vibrate(seated ? VIBRATION_CONFIG.seated : VIBRATION_CONFIG.standing);
@@ -826,6 +872,37 @@ function vibrate(pattern) {
   if ("vibrate" in navigator) {
     navigator.vibrate(pattern);
   }
+}
+
+function playDueArrivingAnnouncement() {
+  if (state.phase !== "riding") {
+    return;
+  }
+
+  const stationSegment = getStationSegment();
+
+  if (stationSegment.mode !== "travel") {
+    return;
+  }
+
+  const leadTime = getArrivingLeadTime();
+
+  if (stationSegment.remaining > leadTime) {
+    return;
+  }
+
+  const key = getStationAnnouncementKey(
+    stationSegment.next,
+    "arriving",
+    stationSegment.legIndex,
+  );
+
+  if (state.arrivingAnnouncementsPlayed.has(key)) {
+    return;
+  }
+
+  state.arrivingAnnouncementsPlayed.add(key);
+  stationAnnouncementPlayer.playArrivingAtStation(stationSegment.next);
 }
 
 function tick(now) {
@@ -860,6 +937,7 @@ function tick(now) {
       }
     } else if (state.phase === "riding") {
       state.rideRemaining -= elapsed;
+      playDueArrivingAnnouncement();
 
       if (state.rideRemaining <= 0) {
         finishRide();
