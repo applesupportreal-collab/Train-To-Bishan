@@ -671,7 +671,7 @@ function getActionState(now = performance.now()) {
   if (state.phase === "waiting") {
     return {
       enabled: false,
-      label: "Waiting for train",
+      label: formatTime(state.arrivalRemaining),
       type: "none",
     };
   }
