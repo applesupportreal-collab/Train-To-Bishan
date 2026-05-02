@@ -38,13 +38,97 @@ button {
   touch-action: manipulation;
 }
 
-.game {
-  display: grid;
-  grid-template-rows: minmax(360px, 58vh) 1fr;
+.app-frame {
+  position: relative;
   min-height: 100dvh;
   background:
     linear-gradient(180deg, rgba(29, 37, 44, 0.15), rgba(29, 37, 44, 0.42)),
     var(--paper);
+}
+
+.device-indicator {
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top));
+  right: 16px;
+  z-index: 30;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 2px solid rgba(38, 49, 58, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 250, 240, 0.86);
+  color: #26313a;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+  font-size: 1.45rem;
+}
+
+.material-symbols-rounded {
+  font-family: "Material Symbols Rounded";
+  font-style: normal;
+  font-weight: normal;
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-feature-settings: "liga";
+  -webkit-font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
+}
+
+.screen[hidden],
+.start-screen[hidden] {
+  display: none !important;
+}
+
+.start-screen {
+  display: grid;
+  min-height: 100dvh;
+  align-content: center;
+  justify-items: center;
+  gap: 24px;
+  padding: max(26px, env(safe-area-inset-top)) 20px max(22px, env(safe-area-inset-bottom));
+  background:
+    linear-gradient(180deg, rgba(23, 32, 38, 0.12), rgba(23, 32, 38, 0.34)),
+    url("assets/main-background-placeholder.svg");
+  background-position: center;
+  background-size: cover;
+  overflow: hidden;
+  text-align: center;
+}
+
+.title-lockup {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+
+.title-lockup h1 {
+  max-width: 8ch;
+  margin: 0 auto;
+  font-size: clamp(3.3rem, 19vw, 5.8rem);
+  line-height: 0.88;
+}
+
+.title-lockup p {
+  margin: 0;
+  color: #33404a;
+  font-size: 1.05rem;
+  font-weight: 850;
+}
+
+.start-screen > .primary {
+  width: min(100%, 320px);
+  padding: 0 18px;
+}
+
+.game {
+  display: grid;
+  grid-template-rows: minmax(360px, 58vh) 1fr;
+  min-height: 100dvh;
+  background: var(--paper);
 }
 
 .scene {
@@ -98,6 +182,7 @@ button {
   top: max(74px, calc(env(safe-area-inset-top) + 54px));
   left: 18px;
   right: 18px;
+  z-index: 8;
   max-width: 460px;
   padding: 10px 12px;
   border-radius: 6px;
@@ -316,71 +401,19 @@ button {
   background: #5c8b8b;
 }
 
-.seat-row {
+.train-interior {
   position: absolute;
-  right: 12%;
-  bottom: 18%;
-  display: flex;
-  gap: 8px;
-  opacity: 0;
-  transform: translateY(28px);
-  transition:
-    opacity 300ms ease,
-    transform 300ms ease;
+  inset: 0;
+  z-index: 4;
+  background:
+    linear-gradient(180deg, rgba(23, 32, 38, 0.08), rgba(23, 32, 38, 0.18)),
+    url("assets/train-interior-placeholder.svg");
+  background-position: center;
+  background-size: cover;
 }
 
-.seat-row.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.seat-row span {
-  width: 44px;
-  height: 38px;
-  border: 3px solid #26313a;
-  border-radius: 8px 8px 16px 16px;
-  background: #e6514f;
-  box-shadow: inset 0 -10px 0 rgba(0, 0, 0, 0.12);
-}
-
-.handrail {
-  position: absolute;
-  left: 17%;
-  right: 17%;
-  bottom: 23%;
-  height: 118px;
-  border-top: 8px solid #f6d35b;
-  opacity: 0;
-  transform: translateY(26px);
-  transition:
-    opacity 300ms ease,
-    transform 300ms ease;
-}
-
-.handrail.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.handrail span {
-  position: absolute;
-  top: 0;
-  width: 5px;
-  height: 86px;
-  border-radius: 99px;
-  background: #f6d35b;
-}
-
-.handrail span:nth-child(1) {
-  left: 12%;
-}
-
-.handrail span:nth-child(2) {
-  left: 50%;
-}
-
-.handrail span:nth-child(3) {
-  right: 12%;
+.train-interior[hidden] {
+  display: none;
 }
 
 .hud {
@@ -392,26 +425,29 @@ button {
   box-shadow: 0 -16px 30px rgba(0, 0, 0, 0.16);
 }
 
-.route {
+.station-segment {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: minmax(78px, auto) 1fr minmax(78px, auto);
   align-items: center;
   gap: 10px;
   color: var(--muted);
   font-size: 0.78rem;
-  font-weight: 800;
+  font-weight: 900;
   text-transform: uppercase;
 }
 
-.track {
-  position: relative;
+.station-segment > span:last-child {
+  text-align: right;
+}
+
+.segment-track {
   height: 8px;
   overflow: hidden;
   border-radius: 999px;
   background: #d7d1c4;
 }
 
-.progress {
+.segment-track span {
   display: block;
   width: 0%;
   height: 100%;
@@ -422,8 +458,16 @@ button {
 
 .meters {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 10px;
+}
+
+.meters[hidden] {
+  display: none;
+}
+
+.meters.single {
+  grid-template-columns: 1fr;
 }
 
 .meter {
@@ -434,8 +478,11 @@ button {
   background: #ffffff;
 }
 
-.meter span,
-.rush-copy span {
+.meter[hidden] {
+  display: none;
+}
+
+.meter span {
   display: block;
   color: var(--muted);
   font-size: 0.76rem;
@@ -448,42 +495,6 @@ button {
   margin-top: 4px;
   font-size: clamp(1.25rem, 8vw, 2.35rem);
   line-height: 1;
-}
-
-.rush-panel {
-  display: grid;
-  gap: 8px;
-  padding: 13px 14px;
-  border: 2px solid rgba(207, 36, 52, 0.22);
-  border-radius: 8px;
-  background: #fff;
-}
-
-.rush-copy {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.rush-copy strong {
-  font-size: 1.18rem;
-}
-
-.rush-bar {
-  height: 12px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #ebdfcf;
-}
-
-.rush-bar span {
-  display: block;
-  width: 0%;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--yellow), var(--red));
-  transition: width 120ms ease;
 }
 
 .message {
@@ -499,6 +510,7 @@ button {
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
+  margin-top: auto;
 }
 
 .primary,
@@ -520,16 +532,32 @@ button {
   transform: translateY(2px);
 }
 
-.primary.rush {
-  min-height: 76px;
+.action-button {
+  min-height: 82px;
   background: var(--green);
   font-size: 1.35rem;
   box-shadow: 0 12px 22px rgba(22, 128, 96, 0.26);
 }
 
+.action-button:disabled {
+  background: #8b949b;
+  color: #f2f4f3;
+  box-shadow: none;
+}
+
+.action-button:disabled:active {
+  transform: none;
+}
+
 .secondary {
   background: #26313a;
   color: white;
+}
+
+.secondary.compact {
+  min-height: 44px;
+  background: #3f4a52;
+  font-size: 0.92rem;
 }
 
 .sensor-fallback {
@@ -545,6 +573,7 @@ button {
 .paused .scene::after {
   position: absolute;
   inset: 0;
+  z-index: 10;
   display: grid;
   place-items: center;
   padding: 24px;
@@ -579,13 +608,18 @@ button {
     padding: 28px;
   }
 
-  .game {
+  .app-frame {
     width: min(430px, 100%);
     min-height: min(880px, calc(100vh - 56px));
     overflow: hidden;
     border: 8px solid #10171c;
     border-radius: 28px;
     box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  }
+
+  .game,
+  .start-screen {
+    min-height: min(880px, calc(100vh - 56px));
   }
 }
 
@@ -604,7 +638,7 @@ button {
     font-size: 0.94rem;
   }
 
-  .primary.rush {
+  .action-button {
     min-height: 62px;
   }
 }

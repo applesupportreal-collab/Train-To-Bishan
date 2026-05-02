@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" role="img" aria-label="Train interior background placeholder">
+  <defs>
+    <linearGradient id="wall" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#e8f0ef"/>
+      <stop offset="0.55" stop-color="#cbd6d5"/>
+      <stop offset="1" stop-color="#aeb9b7"/>
+    </linearGradient>
+    <linearGradient id="floor" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#7d8587"/>
+      <stop offset="1" stop-color="#3d4549"/>
+    </linearGradient>
+  </defs>
+  <rect width="1080" height="1080" fill="url(#wall)"/>
+  <rect y="690" width="1080" height="390" fill="url(#floor)"/>
+  <rect y="170" width="1080" height="18" fill="#cf2434"/>
+  <rect y="188" width="1080" height="8" fill="#ffffff" opacity="0.8"/>
+  <g opacity="0.38">
+    <rect x="86" y="250" width="260" height="170" rx="14" fill="#91c7db" stroke="#26313a" stroke-width="10"/>
+    <rect x="734" y="250" width="260" height="170" rx="14" fill="#91c7db" stroke="#26313a" stroke-width="10"/>
+    <rect x="440" y="218" width="200" height="414" rx="14" fill="#dce5e3" stroke="#26313a" stroke-width="10"/>
+    <path d="M540 218v414" stroke="#26313a" stroke-width="8"/>
+  </g>
+  <rect x="132" y="778" width="816" height="64" rx="32" fill="#cf2434" opacity="0.32"/>
+  <text x="540" y="952" text-anchor="middle" fill="#172026" opacity="0.38" font-family="Arial, sans-serif" font-size="46" font-weight="700">TRAIN INTERIOR IMAGE PLACEHOLDER</text>
+</svg>

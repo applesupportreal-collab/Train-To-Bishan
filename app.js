@@ -1,9 +1,32 @@
-const DURATIONS = {
-  arrival: 60_000,
-  boarding: 8_000,
-  ride: 90_000,
+const ROUTE_STATIONS = [
+  { code: "NS25", name: "City Hall" },
+  { code: "NS24", name: "Dhoby Ghaut" },
+  { code: "NS23", name: "Somerset" },
+  { code: "NS22", name: "Orchard" },
+  { code: "NS21", name: "Newton" },
+  { code: "NS20", name: "Novena" },
+  { code: "NS19", name: "Toa Payoh" },
+  { code: "NS18", name: "Braddell" },
+  { code: "NS17", name: "Bishan" },
+];
+const GAME_CONFIG = {
+  trainArrivalDuration: 60_000,
+  boardingDuration: 8_000,
+  durationBetweenStations: 12_000,
+  // Optional per-leg overrides, from City Hall -> Dhoby Ghaut through Braddell -> Bishan.
+  stationDurations: [],
 };
-
+const DURATIONS = {
+  get arrival() {
+    return GAME_CONFIG.trainArrivalDuration;
+  },
+  get boarding() {
+    return GAME_CONFIG.boardingDuration;
+  },
+  get ride() {
+    return getRideDuration();
+  },
+};
 const SEAT_TARGET = 32;
 const UPRIGHT = {
   betaMin: 52,
@@ -11,24 +34,30 @@ const UPRIGHT = {
   gammaMax: 38,
   staleAfter: 1600,
 };
+const TRAIN_SOUND_CONFIG = {
+  minDelay: 3_500,
+  maxDelay: 13_000,
+  defaultVolume: 1,
+  maxConcurrent: 1,
+};
+const ACTION_ACTIVATION_VIBRATION = [35, 25, 35];
 
 const gameEl = document.querySelector(".game");
 const trainEl = document.querySelector("#train");
 const queueEl = document.querySelector("#queue");
-const seatRowEl = document.querySelector("#seatRow");
-const handrailEl = document.querySelector("#handrail");
+const trainInteriorEl = document.querySelector("#trainInterior");
 const statusRibbonEl = document.querySelector("#statusRibbon");
+const metersEl = document.querySelector("#meters");
+const primaryMeterEl = document.querySelector("#primaryMeter");
 const primaryLabelEl = document.querySelector("#primaryLabel");
 const primaryTimerEl = document.querySelector("#primaryTimer");
-const postureLabelEl = document.querySelector("#postureLabel");
-const routeProgressEl = document.querySelector("#routeProgress");
-const rushPanelEl = document.querySelector("#rushPanel");
-const rushCountEl = document.querySelector("#rushCount");
-const rushFillEl = document.querySelector("#rushFill");
+const deviceIndicatorEl = document.querySelector("#deviceIndicator");
+const currentStationNameEl = document.querySelector("#currentStationName");
+const nextStationNameEl = document.querySelector("#nextStationName");
+const segmentProgressEl = document.querySelector("#segmentProgress");
 const messageEl = document.querySelector("#message");
 const startButtonEl = document.querySelector("#startButton");
-const rushButtonEl = document.querySelector("#rushButton");
-const resetButtonEl = document.querySelector("#resetButton");
+const actionButtonEl = document.querySelector("#actionButton");
 const sensorFallbackEl = document.querySelector("#sensorFallback");
 
 const state = {
@@ -39,6 +68,7 @@ const state = {
   rideRemaining: DURATIONS.ride,
   rushes: 0,
   seated: false,
+  lastActionKey: "none:false",
   motionPermission: "unknown",
   usingSimulatedMotion: false,
   simulatedUpright: true,
@@ -54,6 +84,234 @@ function formatTime(ms) {
   const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
   const seconds = String(totalSeconds % 60).padStart(2, "0");
   return `${minutes}:${seconds}`;
+}
+
+function getStationDurations() {
+  const legCount = Math.max(0, ROUTE_STATIONS.length - 1);
+  const configuredDurations = Array.isArray(GAME_CONFIG.stationDurations)
+    ? GAME_CONFIG.stationDurations
+    : [];
+
+  return Array.from({ length: legCount }, (_, index) => {
+    const fallbackDuration = GAME_CONFIG.durationBetweenStations;
+    const configuredDuration = Number(configuredDurations[index] ?? fallbackDuration);
+    return Number.isFinite(configuredDuration) && configuredDuration > 0
+      ? configuredDuration
+      : fallbackDuration;
+  });
+}
+
+function getRideDuration() {
+  return getStationDurations().reduce((total, duration) => total + duration, 0);
+}
+
+function getStationSegment() {
+  const stationDurations = getStationDurations();
+  const rideDuration = DURATIONS.ride;
+  let elapsed =
+    state.phase === "riding" || state.phase === "arrived"
+      ? Math.max(0, Math.min(rideDuration, rideDuration - state.rideRemaining))
+      : 0;
+
+  for (let index = 0; index < stationDurations.length; index += 1) {
+    const duration = stationDurations[index];
+
+    if (elapsed < duration) {
+      return {
+        current: ROUTE_STATIONS[index],
+        next: ROUTE_STATIONS[index + 1],
+        progress: duration > 0 ? elapsed / duration : 1,
+      };
+    }
+
+    elapsed -= duration;
+  }
+
+  const finalStationIndex = ROUTE_STATIONS.length - 1;
+  return {
+    current: ROUTE_STATIONS[Math.max(0, finalStationIndex - 1)],
+    next: ROUTE_STATIONS[finalStationIndex],
+    progress: 1,
+  };
+}
+
+function randomBetween(min, max) {
+  return min + Math.random() * (max - min);
+}
+
+function clampVolume(volume) {
+  const numericVolume = Number(volume);
+
+  if (Number.isNaN(numericVolume)) {
+    return TRAIN_SOUND_CONFIG.defaultVolume;
+  }
+
+  return Math.min(1, Math.max(0, numericVolume));
+}
+
+function getTrainSoundEffects() {
+  const configuredEffects = Array.isArray(window.TRAIN_SOUND_EFFECTS)
+    ? window.TRAIN_SOUND_EFFECTS
+    : [];
+
+  return configuredEffects
+    .map((effect) => {
+      if (typeof effect === "string") {
+        return {
+          src: effect,
+          volume: TRAIN_SOUND_CONFIG.defaultVolume,
+        };
+      }
+
+      if (!effect || typeof effect.src !== "string") {
+        return null;
+      }
+
+      return {
+        src: effect.src,
+        volume: clampVolume(effect.volume ?? TRAIN_SOUND_CONFIG.defaultVolume),
+      };
+    })
+    .filter(Boolean);
+}
+
+function createTrainSoundscape() {
+  let effects = getTrainSoundEffects();
+  const activeAudio = new Set();
+
+  function refresh() {
+    effects = getTrainSoundEffects();
+  }
+
+  function clearAudio(audio) {
+    audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
+    activeAudio.delete(audio);
+  }
+
+  return {
+    blocked: false,
+    nextAt: Number.POSITIVE_INFINITY,
+    hasSounds() {
+      refresh();
+      return effects.length > 0;
+    },
+    unlock() {
+      refresh();
+
+      if (effects.length === 0) {
+        return;
+      }
+
+      const primer = new Audio(effects[0].src);
+      primer.muted = true;
+      primer.volume = 0;
+      primer.preload = "auto";
+      primer.playsInline = true;
+
+      const playAttempt = primer.play();
+
+      if (playAttempt) {
+        playAttempt
+          .then(() => {
+            primer.pause();
+            primer.currentTime = 0;
+          })
+          .catch(() => {});
+      }
+    },
+    start(now = performance.now()) {
+      refresh();
+      this.blocked = false;
+      this.scheduleNext(now, 900, 2_400);
+    },
+    stop() {
+      this.nextAt = Number.POSITIVE_INFINITY;
+      activeAudio.forEach(clearAudio);
+      activeAudio.clear();
+    },
+    scheduleNext(now, min = TRAIN_SOUND_CONFIG.minDelay, max = TRAIN_SOUND_CONFIG.maxDelay) {
+      refresh();
+      this.nextAt =
+        effects.length === 0 ? Number.POSITIVE_INFINITY : now + randomBetween(min, max);
+    },
+    tick(now, canPlay) {
+      if (state.phase !== "riding" || !canPlay || effects.length === 0) {
+        return;
+      }
+
+      if (now >= this.nextAt) {
+        this.playRandom();
+        this.scheduleNext(now);
+      }
+    },
+    playRandom() {
+      refresh();
+
+      if (effects.length === 0) {
+        return;
+      }
+
+      if (activeAudio.size >= TRAIN_SOUND_CONFIG.maxConcurrent) {
+        this.scheduleNext(performance.now(), 1_500, 3_000);
+        return;
+      }
+
+      const effect = effects[Math.floor(Math.random() * effects.length)];
+      const audio = new Audio(effect.src);
+      audio.volume = effect.volume;
+      audio.preload = "auto";
+      audio.playsInline = true;
+
+      audio.addEventListener("ended", () => clearAudio(audio), { once: true });
+      audio.addEventListener("error", () => clearAudio(audio), { once: true });
+
+      activeAudio.add(audio);
+
+      const playAttempt = audio.play();
+
+      if (playAttempt) {
+        playAttempt.catch(() => {
+          this.blocked = true;
+          clearAudio(audio);
+          render();
+        });
+      }
+    },
+    enableFromGesture() {
+      this.blocked = false;
+      this.unlock();
+
+      if (state.phase === "riding") {
+        this.playRandom();
+        this.scheduleNext(performance.now());
+      }
+
+      render();
+    },
+  };
+}
+
+const trainSoundscape = createTrainSoundscape();
+const startScreenEl = document.querySelector("#startScreen");
+const playScreenEl = document.querySelector("#playScreen");
+
+function mediaMatches(query) {
+  return typeof window.matchMedia === "function" && window.matchMedia(query).matches;
+}
+
+function isLikelyComputer() {
+  const hasMouseLikePointer = mediaMatches("(pointer: fine)");
+  const canHover = mediaMatches("(hover: hover)");
+  const hasCoarsePointer = mediaMatches("(pointer: coarse)");
+  const mobileUserAgent = /Android|iPhone|iPad|iPod|Mobi|Mobile/i.test(navigator.userAgent);
+
+  return (hasMouseLikePointer && canHover) || (!mobileUserAgent && !hasCoarsePointer);
+}
+
+function shouldCheckUpright() {
+  return !isLikelyComputer();
 }
 
 function canUseRealMotion() {
@@ -79,6 +337,10 @@ function isRealUpright(now = performance.now()) {
 }
 
 function isPhoneUpright(now = performance.now()) {
+  if (!shouldCheckUpright()) {
+    return true;
+  }
+
   if (state.usingSimulatedMotion || !canUseRealMotion()) {
     return state.simulatedUpright;
   }
@@ -87,6 +349,10 @@ function isPhoneUpright(now = performance.now()) {
 }
 
 function phaseNeedsUpright() {
+  if (!shouldCheckUpright()) {
+    return false;
+  }
+
   if (state.phase === "waiting" || state.phase === "boarding") {
     return true;
   }
@@ -99,6 +365,12 @@ function countdownCanMove(now) {
 }
 
 async function requestMotionAccess() {
+  if (!shouldCheckUpright()) {
+    state.usingSimulatedMotion = false;
+    state.motionPermission = "not-needed";
+    return;
+  }
+
   if (!canUseRealMotion()) {
     state.usingSimulatedMotion = true;
     state.motionPermission = "fallback";
@@ -134,6 +406,7 @@ function handleOrientation(event) {
 }
 
 function resetState() {
+  trainSoundscape.stop();
   state.phase = "idle";
   state.lastTick = 0;
   state.arrivalRemaining = DURATIONS.arrival;
@@ -141,11 +414,13 @@ function resetState() {
   state.rideRemaining = DURATIONS.ride;
   state.rushes = 0;
   state.seated = false;
+  state.lastActionKey = "none:false";
   state.simulatedUpright = true;
   render();
 }
 
 function startWaiting() {
+  trainSoundscape.stop();
   state.phase = "waiting";
   state.lastTick = performance.now();
   state.arrivalRemaining = DURATIONS.arrival;
@@ -153,6 +428,7 @@ function startWaiting() {
   state.rideRemaining = DURATIONS.ride;
   state.rushes = 0;
   state.seated = false;
+  state.lastActionKey = "none:false";
   requestAnimationFrame(tick);
   render();
 }
@@ -169,11 +445,13 @@ function startRide(seated) {
   state.phase = "riding";
   state.seated = seated;
   state.rideRemaining = DURATIONS.ride;
+  trainSoundscape.start();
   vibrate(seated ? 90 : [40, 35, 40]);
   render();
 }
 
 function finishRide() {
+  trainSoundscape.stop();
   state.phase = "arrived";
   state.rideRemaining = 0;
   vibrate([120, 50, 120]);
@@ -212,7 +490,9 @@ function tick(now) {
   const elapsed = Math.min(250, now - state.lastTick);
   state.lastTick = now;
 
-  if (countdownCanMove(now)) {
+  const canMove = countdownCanMove(now);
+
+  if (canMove) {
     if (state.phase === "waiting") {
       state.arrivalRemaining -= elapsed;
 
@@ -236,6 +516,7 @@ function tick(now) {
     }
   }
 
+  trainSoundscape.tick(now, canMove);
   render();
   requestAnimationFrame(tick);
 }
@@ -244,32 +525,50 @@ function render() {
   const now = performance.now();
   const upright = isPhoneUpright(now);
   const paused = phaseNeedsUpright() && !upright;
+  const usesUprightCheck = shouldCheckUpright();
   const needsMotionFallback =
-    state.usingSimulatedMotion ||
-    !canUseRealMotion() ||
-    (state.phase !== "idle" &&
-      state.motionPermission === "granted" &&
-      !realMotionIsFresh(now));
+    usesUprightCheck &&
+    (state.usingSimulatedMotion ||
+      !canUseRealMotion() ||
+      (state.phase !== "idle" &&
+        state.motionPermission === "granted" &&
+        !realMotionIsFresh(now)));
 
+  startScreenEl.hidden = state.phase !== "idle";
+  playScreenEl.hidden = state.phase === "idle";
   gameEl.classList.toggle("paused", paused);
   document.body.classList.toggle("arrival-pulse", state.phase === "boarding");
   trainEl.classList.toggle("arrived", state.phase !== "idle" && state.arrivalRemaining <= 0);
   trainEl.classList.toggle("boarding", state.phase === "boarding");
   queueEl.classList.toggle("hidden", state.phase === "riding" || state.phase === "arrived");
-  seatRowEl.classList.toggle("visible", state.phase === "riding" && state.seated);
-  handrailEl.classList.toggle("visible", state.phase === "riding" && !state.seated);
+  trainInteriorEl.hidden = state.phase !== "riding" && state.phase !== "arrived";
 
   sensorFallbackEl.hidden = !needsMotionFallback;
   sensorFallbackEl.textContent = state.simulatedUpright ? "Simulated upright" : "Simulated tilted";
 
+  renderDeviceIndicator();
+  renderStationSegment();
   renderPhaseCopy(paused, upright);
   renderTimers();
-  renderRushPanel();
   renderActions();
 }
 
+function renderDeviceIndicator() {
+  const desktopMode = isLikelyComputer();
+  deviceIndicatorEl.textContent = desktopMode ? "desktop_windows" : "smartphone";
+  deviceIndicatorEl.setAttribute("aria-label", desktopMode ? "Desktop device" : "Mobile device");
+  deviceIndicatorEl.removeAttribute("title");
+}
+
+function renderStationSegment() {
+  const stationSegment = getStationSegment();
+  currentStationNameEl.textContent = stationSegment.current.name;
+  nextStationNameEl.textContent = stationSegment.next.name;
+  segmentProgressEl.style.width = `${Math.round(stationSegment.progress * 100)}%`;
+}
+
 function renderPhaseCopy(paused, upright) {
-  postureLabelEl.textContent = upright || !phaseNeedsUpright() ? "Clear" : "Tilted";
+  const usesUprightCheck = shouldCheckUpright();
 
   if (state.phase === "idle") {
     statusRibbonEl.textContent = "Platform queue forming";
@@ -285,7 +584,9 @@ function renderPhaseCopy(paused, upright) {
 
   if (state.phase === "waiting") {
     statusRibbonEl.textContent = "Train approaching City Hall";
-    messageEl.textContent = "Stay upright in the queue.";
+    messageEl.textContent = usesUprightCheck
+      ? "Stay upright in the queue."
+      : "Wait in the queue until the train arrives.";
     return;
   }
 
@@ -303,73 +604,132 @@ function renderPhaseCopy(paused, upright) {
 
   if (state.phase === "riding") {
     statusRibbonEl.textContent = "Standing room only";
-    messageEl.textContent = "Hold steady on the handrail until Bishan.";
+    messageEl.textContent = usesUprightCheck
+      ? "Keep the phone upright until Bishan."
+      : "Ride it out standing until Bishan.";
     return;
   }
 
-  statusRibbonEl.textContent = "Arrived at Bishan";
+  statusRibbonEl.textContent = "Arrived at Bishan station";
   messageEl.textContent = state.seated
-    ? "You made it to Bishan with a seat."
-    : "You made it to Bishan standing.";
+    ? "You made it to Bishan station with a seat."
+    : "You made it to Bishan station standing.";
 }
 
 function renderTimers() {
-  if (state.phase === "idle" || state.phase === "waiting") {
-    primaryLabelEl.textContent = "Next train";
-    primaryTimerEl.textContent = formatTime(state.arrivalRemaining);
-  } else if (state.phase === "boarding") {
+  const showPrimaryTimer = state.phase !== "idle" && state.phase !== "waiting";
+  metersEl.hidden = !showPrimaryTimer;
+  primaryMeterEl.hidden = !showPrimaryTimer;
+  metersEl.classList.add("single");
+
+  if (state.phase === "boarding") {
     primaryLabelEl.textContent = "Boarding";
     primaryTimerEl.textContent = formatTime(state.boardingRemaining);
   } else if (state.phase === "riding") {
-    primaryLabelEl.textContent = state.seated ? "Ride" : "Grip time";
+    primaryLabelEl.textContent = state.seated ? "Ride" : "Standing";
     primaryTimerEl.textContent = formatTime(state.rideRemaining);
   } else {
     primaryLabelEl.textContent = "Arrived";
     primaryTimerEl.textContent = "00:00";
   }
 
-  const rideProgress = 1 - state.rideRemaining / DURATIONS.ride;
-  const arrivalProgress = 1 - state.arrivalRemaining / DURATIONS.arrival;
-  const boardingBonus = state.phase === "boarding" ? 0.05 : 0;
-  const progress =
-    state.phase === "idle"
-      ? 0
-      : state.phase === "waiting" || state.phase === "boarding"
-        ? Math.min(0.18, arrivalProgress * 0.18 + boardingBonus)
-        : state.phase === "riding"
-          ? 0.18 + rideProgress * 0.82
-          : 1;
-
-  routeProgressEl.style.width = `${Math.round(progress * 100)}%`;
 }
 
-function renderRushPanel() {
-  const visible = state.phase === "boarding";
-  rushPanelEl.hidden = !visible;
+function getActionState(now = performance.now()) {
+  if (state.phase === "boarding") {
+    return {
+      enabled: countdownCanMove(now),
+      label: "Snatch seat",
+      type: "rush",
+    };
+  }
 
-  if (!visible) {
+  if (state.phase === "riding" && trainSoundscape.blocked && trainSoundscape.hasSounds()) {
+    return {
+      enabled: true,
+      label: "Enable sound",
+      type: "sound",
+    };
+  }
+
+  if (state.phase === "arrived") {
+    return {
+      enabled: true,
+      label: "Try again",
+      type: "reset",
+    };
+  }
+
+  if (phaseNeedsUpright() && !countdownCanMove(now)) {
+    return {
+      enabled: false,
+      label: "Hold phone upright",
+      type: "none",
+    };
+  }
+
+  if (state.phase === "waiting") {
+    return {
+      enabled: false,
+      label: "Waiting for train",
+      type: "none",
+    };
+  }
+
+  if (state.phase === "riding") {
+    return {
+      enabled: false,
+      label: state.seated ? "Resting" : "Riding to Bishan",
+      type: "none",
+    };
+  }
+
+  return {
+    enabled: false,
+    label: "Waiting",
+    type: "none",
+  };
+}
+
+function triggerAction() {
+  const action = getActionState();
+
+  if (!action.enabled) {
     return;
   }
 
-  const percent = Math.min(100, (state.rushes / SEAT_TARGET) * 100);
-  rushCountEl.textContent = `${state.rushes} / ${SEAT_TARGET}`;
-  rushFillEl.style.width = `${percent}%`;
+  if (action.type === "rush") {
+    rush();
+  } else if (action.type === "sound") {
+    trainSoundscape.enableFromGesture();
+  } else if (action.type === "reset") {
+    resetState();
+  }
 }
 
 function renderActions() {
+  const action = getActionState();
+  const actionKey = `${action.type}:${action.enabled}`;
+  const actionJustActivated = action.enabled && actionKey !== state.lastActionKey;
+
+  if (actionJustActivated) {
+    vibrate(ACTION_ACTIVATION_VIBRATION);
+  }
+
+  state.lastActionKey = actionKey;
   startButtonEl.hidden = state.phase !== "idle";
-  rushButtonEl.hidden = state.phase !== "boarding";
-  resetButtonEl.hidden = state.phase !== "arrived";
+  actionButtonEl.textContent = action.label;
+  actionButtonEl.disabled = !action.enabled;
+  actionButtonEl.dataset.action = action.type;
 }
 
 startButtonEl.addEventListener("click", async () => {
+  trainSoundscape.unlock();
   await requestMotionAccess();
   startWaiting();
 });
 
-rushButtonEl.addEventListener("click", rush);
-
-resetButtonEl.addEventListener("click", resetState);
+actionButtonEl.addEventListener("click", triggerAction);
 
 sensorFallbackEl.addEventListener("click", () => {
   state.usingSimulatedMotion = true;
@@ -388,7 +748,7 @@ window.addEventListener("keydown", (event) => {
 
   if (event.code === "Space") {
     event.preventDefault();
-    rush();
+    triggerAction();
   }
 });
 

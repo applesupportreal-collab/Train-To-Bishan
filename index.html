@@ -4,11 +4,36 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Train to Bishan</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,600,0,0"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="game" aria-live="polite">
-      <section class="scene" aria-label="City Hall MRT platform">
+    <main class="app-frame" aria-live="polite">
+      <span
+        class="device-indicator material-symbols-rounded"
+        id="deviceIndicator"
+        aria-label="Mobile device"
+      >
+        smartphone
+      </span>
+
+      <section class="start-screen" id="startScreen" aria-label="Train to Bishan main screen">
+        <div class="title-lockup">
+          <span class="line-code">NSL</span>
+          <h1>Train to Bishan</h1>
+          <p>City Hall to Bishan station</p>
+        </div>
+
+        <button class="primary" id="startButton" type="button">Start commute</button>
+      </section>
+
+      <section class="game screen" id="playScreen" aria-label="Train to Bishan game" hidden>
+        <div class="scene" aria-label="City Hall MRT platform">
         <div class="station-sign">
           <span class="line-code">NS25</span>
           <span>City Hall</span>
@@ -35,63 +60,41 @@
           <span class="commuter tote"></span>
         </div>
 
-        <div class="seat-row" id="seatRow">
-          <span></span>
-          <span></span>
-          <span></span>
+        <div class="train-interior" id="trainInterior" aria-hidden="true" hidden></div>
         </div>
 
-        <div class="handrail" id="handrail">
-          <span></span>
-          <span></span>
-          <span></span>
-        </div>
-      </section>
-
-      <section class="hud">
-        <div class="route">
-          <span>City Hall</span>
-          <div class="track">
-            <span class="progress" id="routeProgress"></span>
+        <div class="hud">
+        <div class="station-segment" id="stationSegment" aria-label="Current and next station">
+          <span id="currentStationName">City Hall</span>
+          <div class="segment-track">
+            <span id="segmentProgress"></span>
           </div>
-          <span>Bishan</span>
+          <span id="nextStationName">Dhoby Ghaut</span>
         </div>
 
-        <div class="meters">
-          <div class="meter">
-            <span id="primaryLabel">Next train</span>
-            <strong id="primaryTimer">01:00</strong>
-          </div>
-          <div class="meter">
-            <span>Posture</span>
-            <strong id="postureLabel">Waiting</strong>
-          </div>
-        </div>
-
-        <div class="rush-panel" id="rushPanel" hidden>
-          <div class="rush-copy">
-            <span>Door rush</span>
-            <strong id="rushCount">0 / 32</strong>
-          </div>
-          <div class="rush-bar">
-            <span id="rushFill"></span>
+        <div class="meters" id="meters">
+          <div class="meter" id="primaryMeter">
+            <span id="primaryLabel">Boarding</span>
+            <strong id="primaryTimer">00:08</strong>
           </div>
         </div>
 
         <p class="message" id="message">Tap start when you are at the platform.</p>
 
-        <div class="actions">
-          <button class="primary" id="startButton" type="button">Start commute</button>
-          <button class="primary rush" id="rushButton" type="button" hidden>Snatch seat</button>
-          <button class="secondary" id="resetButton" type="button" hidden>Try again</button>
-        </div>
-
         <button class="sensor-fallback" id="sensorFallback" type="button" hidden>
           Simulated upright
         </button>
+
+        <div class="actions">
+          <button class="primary action-button" id="actionButton" type="button" disabled>
+            Waiting
+          </button>
+        </div>
+        </div>
       </section>
     </main>
 
+    <script src="sounds/playlist.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
