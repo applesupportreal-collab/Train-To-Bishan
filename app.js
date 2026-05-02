@@ -1002,7 +1002,7 @@ function renderRouteCopy() {
   routeSubtitleEl.textContent = `${origin.name} to ${destination.name} station`;
   stationSignCodeEl.textContent = origin.code;
   stationSignNameEl.textContent = origin.name;
-  successHeadingEl.textContent = `Arrived at ${destination.name}!`;
+  successHeadingEl.textContent = `You Survived Train to ${destination.name}!`;
   successStationCodeEl.textContent = destination.code;
 }
 
@@ -1105,7 +1105,7 @@ function getActionState(now = performance.now()) {
   if (state.phase === "arrived") {
     return {
       enabled: true,
-      label: "Try again",
+      label: "Play again",
       type: "reset",
     };
   }
