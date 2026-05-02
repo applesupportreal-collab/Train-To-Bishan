@@ -458,9 +458,6 @@ const settingsButtonEl = document.querySelector("#settingsButton");
 const settingsBackButtonEl = document.querySelector("#settingsBackButton");
 const settingsFormEl = document.querySelector("#settingsForm");
 const settingsResetButtonEl = document.querySelector("#settingsResetButton");
-const creditsScreenEl = document.querySelector("#creditsScreen");
-const creditsButtonEl = document.querySelector("#creditsButton");
-const creditsBackButtonEl = document.querySelector("#creditsBackButton");
 const settingsInputEls = Object.fromEntries(
   [...document.querySelectorAll("[data-setting]")].map((input) => [input.dataset.setting, input]),
 );
@@ -476,7 +473,6 @@ let rushShakeTimer = null;
 const state = {
   phase: "idle",
   showingSettings: false,
-  showingCredits: false,
   lastTick: 0,
   arrivalRemaining: DURATIONS.arrival,
   boardingRemaining: DURATIONS.boarding,
@@ -3075,7 +3071,6 @@ function openSettings() {
     return;
   }
 
-  state.showingCredits = false;
   populateSettingsForm();
   state.showingSettings = true;
   render();
@@ -3083,21 +3078,6 @@ function openSettings() {
 
 function closeSettings() {
   state.showingSettings = false;
-  render();
-}
-
-function openCredits() {
-  if (state.phase !== "idle") {
-    return;
-  }
-
-  state.showingSettings = false;
-  state.showingCredits = true;
-  render();
-}
-
-function closeCredits() {
-  state.showingCredits = false;
   render();
 }
 
@@ -3142,7 +3122,6 @@ function resetState() {
   doorClosingPlayer.stop();
   state.phase = "idle";
   state.showingSettings = false;
-  state.showingCredits = false;
   state.lastTick = 0;
   clearDwellDelayExtensions();
   resetCountdowns();
@@ -3176,7 +3155,6 @@ function startWaiting() {
   doorClosingPlayer.stop();
   state.phase = "waiting";
   state.showingSettings = false;
-  state.showingCredits = false;
   state.lastTick = performance.now();
   clearDwellDelayExtensions();
   resetCountdowns();
@@ -3444,16 +3422,12 @@ function render() {
         state.motionPermission === "granted" &&
         !realMotionIsFresh(now)));
 
-  startScreenEl.hidden = state.phase !== "idle" || state.showingSettings || state.showingCredits;
+  startScreenEl.hidden = state.phase !== "idle" || state.showingSettings;
   settingsScreenEl.hidden = !state.showingSettings;
-  creditsScreenEl.hidden = !state.showingCredits;
   playScreenEl.hidden =
-    state.showingSettings ||
-    state.showingCredits ||
-    state.phase === "idle" ||
-    state.phase === "arrived";
-  successScreenEl.hidden = state.showingSettings || state.showingCredits || state.phase !== "arrived";
-  deviceIndicatorEl.hidden = state.showingSettings || state.showingCredits;
+    state.showingSettings || state.phase === "idle" || state.phase === "arrived";
+  successScreenEl.hidden = state.showingSettings || state.phase !== "arrived";
+  deviceIndicatorEl.hidden = state.showingSettings;
   gameEl.classList.toggle("paused", paused);
   document.body.classList.toggle("arrival-pulse", state.phase === "boarding");
   trainEl.classList.toggle("arrived", state.phase !== "idle" && state.arrivalRemaining <= 0);
@@ -3804,8 +3778,6 @@ settingsButtonEl.addEventListener("click", openSettings);
 settingsBackButtonEl.addEventListener("click", closeSettings);
 settingsFormEl.addEventListener("submit", saveSettings);
 settingsResetButtonEl.addEventListener("click", resetSettingsToConfig);
-creditsButtonEl.addEventListener("click", openCredits);
-creditsBackButtonEl.addEventListener("click", closeCredits);
 
 actionButtonEl.addEventListener("click", triggerAction);
 
