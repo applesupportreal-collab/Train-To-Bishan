@@ -1,5 +1,6 @@
 const CONFIG_PATH = "config/game-config.json";
 const SCRIPT_CONFIG_GLOBAL = "TRAIN_TO_BISHAN_GAME_CONFIG";
+const DEMO_SKIP_QUERY_VALUE = "true";
 const DEFAULT_GAME_SETTINGS = {
   routeStations: [
     { code: "NS25", name: "City Hall" },
@@ -155,6 +156,14 @@ function cloneVibrationConfig(config) {
   };
 }
 
+function readDemoSkipEnabled() {
+  try {
+    return new URLSearchParams(window.location.search).get("skip") === DEMO_SKIP_QUERY_VALUE;
+  } catch {
+    return false;
+  }
+}
+
 function readObject(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
@@ -286,8 +295,10 @@ const stationSignCodeEl = document.querySelector(".station-sign .line-code");
 const stationSignNameEl = document.querySelector(".station-sign span:last-child");
 const successHeadingEl = document.querySelector(".success-copy h2");
 const successStationCodeEl = document.querySelector(".success-copy .line-code");
+const skipButtonEl = document.querySelector("#skipButton");
 const MAIN_SUBTITLE_HTML =
   "Experience the daily commute of the average Singaporean from the <s>comfort</s> discomfort of your home!";
+const DEMO_SKIP_ENABLED = readDemoSkipEnabled();
 const STATUS_TEXT_DURATION = 5_000;
 const STATUS_TEXT_FADE_DURATION = 420;
 let statusTextHideTimer = null;
@@ -355,13 +366,20 @@ function getRideDuration() {
   return travelDuration + dwellCount * GAME_CONFIG.stationDwellDuration;
 }
 
+function getRideElapsed() {
+  const rideDuration = DURATIONS.ride;
+
+  if (state.phase !== "riding" && state.phase !== "arrived") {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(rideDuration, rideDuration - state.rideRemaining));
+}
+
 function getStationSegment() {
   const stationDurations = getStationDurations();
   const rideDuration = DURATIONS.ride;
-  let elapsed =
-    state.phase === "riding" || state.phase === "arrived"
-      ? Math.max(0, Math.min(rideDuration, rideDuration - state.rideRemaining))
-      : 0;
+  let elapsed = getRideElapsed();
 
   for (let index = 0; index < stationDurations.length; index += 1) {
     const duration = stationDurations[index];
@@ -906,23 +924,35 @@ function getTrainSoundEffects() {
 let activeStartSound = null;
 let activeEndSound = null;
 
-function clearStartSound() {
+function clearStartSound(immediate = false) {
   if (!activeStartSound) {
     return;
   }
 
   const audio = activeStartSound;
   activeStartSound = null;
+
+  if (immediate) {
+    disposeAudio(audio);
+    return;
+  }
+
   stopAudioWithFade(audio, () => disposeAudio(audio));
 }
 
-function clearEndSound() {
+function clearEndSound(immediate = false) {
   if (!activeEndSound) {
     return;
   }
 
   const audio = activeEndSound;
   activeEndSound = null;
+
+  if (immediate) {
+    disposeAudio(audio);
+    return;
+  }
+
   stopAudioWithFade(audio, () => disposeAudio(audio));
 }
 
@@ -1046,13 +1076,19 @@ function createDoorClosingSoundPlayer() {
       : "";
   }
 
-  function clearActiveAudio() {
+  function clearActiveAudio(immediate = false) {
     if (!activeAudio) {
       return;
     }
 
     const audio = activeAudio;
     activeAudio = null;
+
+    if (immediate) {
+      disposeAudio(audio);
+      return;
+    }
+
     stopAudioWithFade(audio, () => disposeAudio(audio));
   }
 
@@ -1094,10 +1130,10 @@ function createDoorClosingSoundPlayer() {
           });
       }
     },
-    stop() {
+    stop(immediate = false) {
       pending = false;
       this.blocked = false;
-      clearActiveAudio();
+      clearActiveAudio(immediate);
     },
     play() {
       if (!this.hasSound()) {
@@ -1204,8 +1240,14 @@ function createStationAnnouncementPlayer() {
   let pendingAnnouncement = null;
   const activeAudio = new Set();
 
-  function clearAudio(audio) {
+  function clearAudio(audio, immediate = false) {
     activeAudio.delete(audio);
+
+    if (immediate) {
+      disposeAudio(audio);
+      return;
+    }
+
     stopAudioWithFade(audio, () => disposeAudio(audio));
   }
 
@@ -1244,10 +1286,10 @@ function createStationAnnouncementPlayer() {
           });
       }
     },
-    stop() {
+    stop(immediate = false) {
       pendingAnnouncement = null;
       this.blocked = false;
-      activeAudio.forEach(clearAudio);
+      activeAudio.forEach((audio) => clearAudio(audio, immediate));
       activeAudio.clear();
     },
     playStationAnnouncement(station, type) {
@@ -1355,8 +1397,14 @@ function createTrainSoundscape() {
     effects = getTrainSoundEffects();
   }
 
-  function clearAudio(audio) {
+  function clearAudio(audio, immediate = false) {
     activeAudio.delete(audio);
+
+    if (immediate) {
+      disposeAudio(audio);
+      return;
+    }
+
     stopAudioWithFade(audio, () => disposeAudio(audio));
   }
 
@@ -1408,9 +1456,9 @@ function createTrainSoundscape() {
       );
       logSoundDebug("Random train soundscape started.", { sounds: effects.length });
     },
-    stop() {
+    stop(immediate = false) {
       this.nextAt = Number.POSITIVE_INFINITY;
-      activeAudio.forEach(clearAudio);
+      activeAudio.forEach((audio) => clearAudio(audio, immediate));
       activeAudio.clear();
     },
     scheduleNext(now, min = TRAIN_SOUND_CONFIG.minDelay, max = TRAIN_SOUND_CONFIG.maxDelay) {
@@ -1638,6 +1686,82 @@ function handleOrientation(event) {
 
   if (state.motionPermission === "unknown") {
     state.motionPermission = "granted";
+  }
+}
+
+function stopAllAudio(immediate = false) {
+  clearStartSound(immediate);
+  clearEndSound(immediate);
+  trainSoundscape.stop(immediate);
+  stationAnnouncementPlayer.stop(immediate);
+  doorClosingPlayer.stop(immediate);
+}
+
+function canDemoSkip() {
+  return DEMO_SKIP_ENABLED && state.phase !== "idle" && state.phase !== "arrived";
+}
+
+function getNextStationElapsed() {
+  const stationSegment = getStationSegment();
+  const stationDurations = getStationDurations();
+  const elapsed = getRideElapsed();
+
+  if (stationSegment.mode === "travel") {
+    return elapsed + stationSegment.remaining;
+  }
+
+  if (stationSegment.mode === "dwell") {
+    const nextLegDuration = stationDurations[stationSegment.legIndex + 1] ?? 0;
+    return elapsed + stationSegment.remaining + nextLegDuration;
+  }
+
+  return DURATIONS.ride;
+}
+
+function skipRidingToNextStation() {
+  const rideDuration = DURATIONS.ride;
+  const targetElapsed = Math.min(rideDuration, getNextStationElapsed());
+  state.rideRemaining = Math.max(0, rideDuration - targetElapsed);
+  state.lastTick = performance.now();
+  state.lastActionKey = "none:false";
+  resetAuntieEvent();
+
+  if (state.rideRemaining <= 0) {
+    finishRide();
+    return;
+  }
+
+  trainSoundscape.start(performance.now());
+  render();
+}
+
+function skipToNextStation() {
+  if (!canDemoSkip()) {
+    return;
+  }
+
+  stopPretendSleep();
+  stopAllAudio(true);
+  state.lastTick = performance.now();
+
+  if (state.phase === "waiting") {
+    state.arrivalRemaining = 0;
+    startBoarding();
+    stopAllAudio(true);
+    render();
+    return;
+  }
+
+  if (state.phase === "boarding") {
+    state.boardingRemaining = 0;
+    startRide(state.seatProgress >= SEAT_RUSH_CONFIG.seatThreshold);
+    stopAllAudio(true);
+    skipRidingToNextStation();
+    return;
+  }
+
+  if (state.phase === "riding") {
+    skipRidingToNextStation();
   }
 }
 
@@ -1914,6 +2038,7 @@ function render() {
   renderSuccessScreen();
   renderStationSegment();
   renderAuntieEvent();
+  renderDemoSkip();
   renderPhaseCopy(paused, upright);
   renderTimers();
   renderActions();
@@ -1995,6 +2120,11 @@ function renderAuntieEvent() {
   }
 
   auntieEventEl.classList.add("visible");
+}
+
+function renderDemoSkip() {
+  skipButtonEl.hidden = !DEMO_SKIP_ENABLED;
+  skipButtonEl.disabled = !canDemoSkip();
 }
 
 function renderPhaseCopy(paused, upright) {
@@ -2202,6 +2332,8 @@ window.addEventListener("pointerup", stopPretendSleep);
 window.addEventListener("pointercancel", stopPretendSleep);
 
 successRestartButtonEl.addEventListener("click", resetState);
+
+skipButtonEl.addEventListener("click", skipToNextStation);
 
 sensorFallbackEl.addEventListener("click", () => {
   state.usingSimulatedMotion = true;
