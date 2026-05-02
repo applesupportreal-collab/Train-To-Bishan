@@ -15,6 +15,7 @@ Edit `game-config.json` to tune the static game without changing JavaScript.
 - `audioFade.tickInterval` controls how often fade volume ramps update, in milliseconds.
 - `startSound` is the sound that plays from the Start button tap.
 - `endSound` is the sound that plays when the player reaches Bishan.
+- `trainSound.minDelay` and `trainSound.firstMinDelay` are clamped to at least 30000 ms so in-train random sounds stay spaced out.
 - `doorClosingSound.leadTime` controls how many milliseconds before train departure the `doors_are_closing.ogg` clip plays.
 - `announcement.arrivingLeadTime` controls how many milliseconds before each station the `arriving_<station_name>.ogg` clip plays.
 - `auntieEvent.chance` controls the odds that an auntie appears on each departure while the player has a seat.

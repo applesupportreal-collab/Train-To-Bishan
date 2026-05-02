@@ -2,6 +2,7 @@ const CONFIG_PATH = "config/game-config.json";
 const SCRIPT_CONFIG_GLOBAL = "TRAIN_TO_BISHAN_GAME_CONFIG";
 const DEMO_SKIP_QUERY_VALUE = "true";
 const USER_SETTINGS_STORAGE_KEY = "train-to-bishan:user-settings";
+const RANDOM_TRAIN_SOUND_MIN_GAP = 30_000;
 const DEFAULT_GAME_SETTINGS = {
   routeStations: [
     { code: "NS25", name: "City Hall" },
@@ -35,10 +36,10 @@ const DEFAULT_GAME_SETTINGS = {
     checkInterval: 300,
   },
   trainSound: {
-    minDelay: 3_500,
-    maxDelay: 13_000,
-    firstMinDelay: 900,
-    firstMaxDelay: 2_400,
+    minDelay: 30_000,
+    maxDelay: 45_000,
+    firstMinDelay: 30_000,
+    firstMaxDelay: 45_000,
     retryMinDelay: 1_500,
     retryMaxDelay: 3_000,
     defaultVolume: 1,
@@ -214,6 +215,11 @@ function readObject(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 
+function readFiniteNumber(value, fallback) {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : fallback;
+}
+
 function normalizeStations(stations) {
   if (!Array.isArray(stations)) {
     return cloneStations(DEFAULT_GAME_SETTINGS.routeStations);
@@ -253,6 +259,28 @@ function applyGameSettings(settings) {
     ...DEFAULT_GAME_SETTINGS.trainSound,
     ...readObject(externalSettings.trainSound),
   };
+  TRAIN_SOUND_CONFIG.minDelay = Math.max(
+    RANDOM_TRAIN_SOUND_MIN_GAP,
+    readFiniteNumber(TRAIN_SOUND_CONFIG.minDelay, DEFAULT_GAME_SETTINGS.trainSound.minDelay),
+  );
+  TRAIN_SOUND_CONFIG.maxDelay = Math.max(
+    TRAIN_SOUND_CONFIG.minDelay,
+    readFiniteNumber(TRAIN_SOUND_CONFIG.maxDelay, DEFAULT_GAME_SETTINGS.trainSound.maxDelay),
+  );
+  TRAIN_SOUND_CONFIG.firstMinDelay = Math.max(
+    RANDOM_TRAIN_SOUND_MIN_GAP,
+    readFiniteNumber(
+      TRAIN_SOUND_CONFIG.firstMinDelay,
+      DEFAULT_GAME_SETTINGS.trainSound.firstMinDelay,
+    ),
+  );
+  TRAIN_SOUND_CONFIG.firstMaxDelay = Math.max(
+    TRAIN_SOUND_CONFIG.firstMinDelay,
+    readFiniteNumber(
+      TRAIN_SOUND_CONFIG.firstMaxDelay,
+      DEFAULT_GAME_SETTINGS.trainSound.firstMaxDelay,
+    ),
+  );
   AUDIO_FADE_CONFIG = {
     ...DEFAULT_GAME_SETTINGS.audioFade,
     ...readObject(externalSettings.audioFade),
