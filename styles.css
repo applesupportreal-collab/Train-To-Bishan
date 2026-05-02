@@ -128,10 +128,11 @@ button {
 .title-lockup p {
   max-width: min(31ch, calc(100vw - 40px));
   margin: 0;
-  color: #33404a;
+  color: #fffdf6;
   font-size: 1.05rem;
   font-weight: 850;
   line-height: 1.28;
+  text-shadow: 0 2px 8px rgba(23, 32, 38, 0.72);
 }
 
 .start-screen > .primary {
