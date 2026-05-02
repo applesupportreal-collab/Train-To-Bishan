@@ -180,14 +180,19 @@ function applyGameSettings(settings) {
 
 async function loadGameSettings() {
   try {
-    const response = await fetch(CONFIG_PATH, { cache: "no-store" });
+    const configUrl = new URL(CONFIG_PATH, window.location.href);
+    configUrl.searchParams.set("cacheBust", Date.now().toString());
+
+    const response = await fetch(configUrl, { cache: "no-store" });
 
     if (!response.ok) {
+      console.warn(`Could not load ${CONFIG_PATH}; using built-in defaults.`);
       return;
     }
 
     applyGameSettings(await response.json());
-  } catch {
+  } catch (error) {
+    console.warn(`Could not load ${CONFIG_PATH}; using built-in defaults.`, error);
     applyGameSettings(DEFAULT_GAME_SETTINGS);
   }
 }
