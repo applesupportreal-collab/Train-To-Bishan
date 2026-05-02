@@ -42,7 +42,7 @@ window.TRAIN_TO_BISHAN_GAME_CONFIG = {
     trainArrivalDuration: 15000,
     boardingDuration: 8000,
     durationBetweenStations: 20000,
-    stationDwellDuration: 20000,
+    stationDwellDuration: 10000,
     stationDurations: [],
   },
   seatRush: {
@@ -118,7 +118,7 @@ window.TRAIN_TO_BISHAN_GAME_CONFIG = {
     arrivingLeadTime: 10000,
   },
   auntieEvent: {
-    chance: 0.2,
+    chance: 0.3,
     imageSrc: "assets/auntie.png",
     scoldAfter: 5000,
     minDuration: 20000,

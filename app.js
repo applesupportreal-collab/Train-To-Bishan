@@ -795,7 +795,7 @@ function forceStandForAuntie() {
   state.seated = false;
   state.lastActionKey = "none:false";
   vibrate(VIBRATION_CONFIG.standing);
-  showStatusText("Auntie scolded you into giving up your seat.", "danger");
+  showStatusText("Auntie scolded you into giving up your seat!", "danger");
 }
 
 function startAuntieEvent() {
@@ -3578,7 +3578,7 @@ function renderPhaseCopy(paused, upright) {
 
   if (state.phase === "boarding") {
     statusRibbonEl.textContent = "Doors open";
-    messageEl.textContent = "Keep the seat meter above 95% before the doors close.";
+    messageEl.textContent = "Keep the seat meter above 95% before the doors close!";
     return;
   }
 
@@ -3594,7 +3594,7 @@ function renderPhaseCopy(paused, upright) {
     const stationSegment = getStationSegment();
     statusRibbonEl.classList.add("success");
     statusRibbonEl.textContent = `Seat available at ${stationSegment.current.name}`;
-    messageEl.textContent = "Spam the button before someone else sits down.";
+    messageEl.textContent = "Snatch your seat before someone else sits down!";
     return;
   }
 
