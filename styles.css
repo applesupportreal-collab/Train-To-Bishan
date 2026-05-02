@@ -113,8 +113,16 @@ button {
 .title-lockup h1 {
   max-width: 8ch;
   margin: 0 auto;
+  color: #fff2e2;
+  font-family: Creepster, Impact, fantasy;
   font-size: clamp(3.3rem, 19vw, 5.8rem);
+  font-weight: 400;
+  letter-spacing: 0;
   line-height: 0.88;
+  text-shadow:
+    0 3px 0 rgba(23, 32, 38, 0.78),
+    0 10px 24px rgba(159, 12, 28, 0.58),
+    0 0 18px rgba(207, 36, 52, 0.42);
 }
 
 .title-lockup p {
