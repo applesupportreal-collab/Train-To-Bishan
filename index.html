@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Train to Bishan</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="game" aria-live="polite">
+      <section class="scene" aria-label="City Hall MRT platform">
+        <div class="station-sign">
+          <span class="line-code">NS25</span>
+          <span>City Hall</span>
+        </div>
+
+        <div class="status-ribbon" id="statusRibbon">Platform queue forming</div>
+
+        <div class="train" id="train">
+          <div class="train-light"></div>
+          <div class="train-car">
+            <div class="window"></div>
+            <div class="door left"></div>
+            <div class="door right"></div>
+            <div class="window small"></div>
+          </div>
+        </div>
+
+        <div class="platform-line"></div>
+        <div class="queue" id="queue">
+          <span class="commuter player"></span>
+          <span class="commuter bag"></span>
+          <span class="commuter cap"></span>
+          <span class="commuter"></span>
+          <span class="commuter tote"></span>
+        </div>
+
+        <div class="seat-row" id="seatRow">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+
+        <div class="handrail" id="handrail">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </section>
+
+      <section class="hud">
+        <div class="route">
+          <span>City Hall</span>
+          <div class="track">
+            <span class="progress" id="routeProgress"></span>
+          </div>
+          <span>Bishan</span>
+        </div>
+
+        <div class="meters">
+          <div class="meter">
+            <span id="primaryLabel">Next train</span>
+            <strong id="primaryTimer">01:00</strong>
+          </div>
+          <div class="meter">
+            <span>Posture</span>
+            <strong id="postureLabel">Waiting</strong>
+          </div>
+        </div>
+
+        <div class="rush-panel" id="rushPanel" hidden>
+          <div class="rush-copy">
+            <span>Door rush</span>
+            <strong id="rushCount">0 / 32</strong>
+          </div>
+          <div class="rush-bar">
+            <span id="rushFill"></span>
+          </div>
+        </div>
+
+        <p class="message" id="message">Tap start when you are at the platform.</p>
+
+        <div class="actions">
+          <button class="primary" id="startButton" type="button">Start commute</button>
+          <button class="primary rush" id="rushButton" type="button" hidden>Snatch seat</button>
+          <button class="secondary" id="resetButton" type="button" hidden>Try again</button>
+        </div>
+
+        <button class="sensor-fallback" id="sensorFallback" type="button" hidden>
+          Simulated upright
+        </button>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
