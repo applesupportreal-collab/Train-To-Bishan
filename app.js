@@ -667,6 +667,7 @@ function render() {
   trainEl.classList.toggle("boarding", state.phase === "boarding");
   queueEl.classList.toggle("hidden", state.phase === "riding" || state.phase === "arrived");
   trainInteriorEl.hidden = state.phase !== "riding" && state.phase !== "arrived";
+  statusRibbonEl.classList.toggle("success", state.phase === "riding" && state.seated);
 
   sensorFallbackEl.hidden = !needsMotionFallback;
   sensorFallbackEl.textContent = state.simulatedUpright ? "Simulated upright" : "Simulated tilted";
@@ -722,7 +723,7 @@ function renderPhaseCopy(paused, upright) {
   }
 
   if (state.phase === "riding" && state.seated) {
-    statusRibbonEl.textContent = "Seat secured";
+    statusRibbonEl.textContent = "Seat secured!";
     messageEl.textContent = "You can rest the phone while the ride continues.";
     return;
   }

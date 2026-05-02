@@ -187,6 +187,10 @@ button {
   font-weight: 750;
 }
 
+.status-ribbon.success {
+  background: var(--green);
+}
+
 .train {
   position: absolute;
   right: 50%;
