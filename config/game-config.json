@@ -86,6 +86,17 @@
     "src": "sounds/auntie.ogg",
     "volume": 1
   },
+  "trainBreakdown": {
+    "chance": 0.01,
+    "minSteps": 500,
+    "maxSteps": 1000,
+    "manualStepsPerPress": 25,
+    "motionThreshold": 12.6,
+    "motionResetThreshold": 10.8,
+    "minStepInterval": 280,
+    "src": "sounds/evacuation.ogg",
+    "volume": 1
+  },
   "trainDelay": {
     "chance": 0.1,
     "extensionDuration": 15000,

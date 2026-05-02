@@ -1059,6 +1059,15 @@ button {
     0 14px 28px rgba(0, 0, 0, 0.34);
 }
 
+.action-button[data-action="walk"] {
+  border-color: #f0c344;
+  background: linear-gradient(180deg, #26313a, #172026);
+  color: #fffdf6;
+  box-shadow:
+    0 0 0 4px rgba(240, 195, 68, 0.18),
+    0 14px 28px rgba(0, 0, 0, 0.3);
+}
+
 .action-button:disabled {
   background: #8b949b;
   color: #f2f4f3;

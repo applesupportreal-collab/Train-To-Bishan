@@ -64,6 +64,17 @@ const DEFAULT_GAME_SETTINGS = {
     src: "sounds/auntie.ogg",
     volume: 1,
   },
+  trainBreakdown: {
+    chance: 0.01,
+    minSteps: 500,
+    maxSteps: 1000,
+    manualStepsPerPress: 25,
+    motionThreshold: 12.6,
+    motionResetThreshold: 10.8,
+    minStepInterval: 280,
+    src: "sounds/evacuation.ogg",
+    volume: 1,
+  },
   trainDelay: {
     chance: 0.1,
     extensionDuration: 15_000,
@@ -125,6 +136,7 @@ let AUDIO_FADE_CONFIG = { ...DEFAULT_GAME_SETTINGS.audioFade };
 let START_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.startSound };
 let END_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.endSound };
 let AUNTIE_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.auntieSound };
+let TRAIN_BREAKDOWN_CONFIG = { ...DEFAULT_GAME_SETTINGS.trainBreakdown };
 let TRAIN_DELAY_CONFIG = { ...DEFAULT_GAME_SETTINGS.trainDelay };
 let DOOR_CLOSING_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.doorClosingSound };
 let ANNOUNCEMENT_CONFIG = { ...DEFAULT_GAME_SETTINGS.announcement };
@@ -318,6 +330,10 @@ function applyGameSettings(settings) {
     ...DEFAULT_GAME_SETTINGS.auntieSound,
     ...readObject(externalSettings.auntieSound),
   };
+  TRAIN_BREAKDOWN_CONFIG = {
+    ...DEFAULT_GAME_SETTINGS.trainBreakdown,
+    ...readObject(externalSettings.trainBreakdown),
+  };
   TRAIN_DELAY_CONFIG = {
     ...DEFAULT_GAME_SETTINGS.trainDelay,
     ...readObject(externalSettings.trainDelay),
@@ -468,8 +484,15 @@ const state = {
   nextStationAnnouncementsPlayed: new Set(),
   arrivingAnnouncementsPlayed: new Set(),
   doorClosingAnnouncementsPlayed: new Set(),
+  breakdownSegmentsChecked: new Set(),
   trainDelayStationsChecked: new Set(),
   auntieDeparturesChecked: new Set(),
+  breakdownActive: false,
+  breakdownSteps: 0,
+  breakdownTargetSteps: 0,
+  breakdownStartProgress: 0,
+  breakdownTargetElapsed: 0,
+  breakdownDestination: null,
   auntieActive: false,
   auntieSide: "left",
   auntieSleeping: false,
@@ -478,8 +501,12 @@ const state = {
   auntieRemaining: 0,
   lastActionKey: "none:false",
   motionPermission: "unknown",
+  stepMotionPermission: "unknown",
   usingSimulatedMotion: false,
   simulatedUpright: true,
+  stepMotionPeakActive: false,
+  lastStepAt: Number.NEGATIVE_INFINITY,
+  lastStepMotionAt: 0,
   orientation: {
     beta: null,
     gamma: null,
@@ -612,6 +639,68 @@ function getSeatOfferChance() {
   const configuredChance = Number(SEAT_OFFER_CONFIG.chance);
   const fallbackChance = DEFAULT_GAME_SETTINGS.seatOffer.chance;
   return Number.isFinite(configuredChance) ? clamp(configuredChance, 0, 1) : fallbackChance;
+}
+
+function getTrainBreakdownChance() {
+  const configuredChance = Number(TRAIN_BREAKDOWN_CONFIG.chance);
+  const fallbackChance = DEFAULT_GAME_SETTINGS.trainBreakdown.chance;
+  return Number.isFinite(configuredChance) ? clamp(configuredChance, 0, 1) : fallbackChance;
+}
+
+function getTrainBreakdownMinSteps() {
+  const configuredSteps = Number(TRAIN_BREAKDOWN_CONFIG.minSteps);
+  const fallbackSteps = DEFAULT_GAME_SETTINGS.trainBreakdown.minSteps;
+  return Number.isFinite(configuredSteps) && configuredSteps >= 1
+    ? Math.round(configuredSteps)
+    : fallbackSteps;
+}
+
+function getTrainBreakdownMaxSteps() {
+  const configuredSteps = Number(TRAIN_BREAKDOWN_CONFIG.maxSteps);
+  const fallbackSteps = DEFAULT_GAME_SETTINGS.trainBreakdown.maxSteps;
+  return Number.isFinite(configuredSteps) && configuredSteps >= 1
+    ? Math.round(configuredSteps)
+    : fallbackSteps;
+}
+
+function getTrainBreakdownTargetSteps() {
+  const minSteps = getTrainBreakdownMinSteps();
+  const maxSteps = getTrainBreakdownMaxSteps();
+  const lowerSteps = Math.min(minSteps, maxSteps);
+  const upperSteps = Math.max(minSteps, maxSteps);
+  return Math.round(randomBetween(lowerSteps, upperSteps));
+}
+
+function getBreakdownManualStepsPerPress() {
+  const configuredSteps = Number(TRAIN_BREAKDOWN_CONFIG.manualStepsPerPress);
+  const fallbackSteps = DEFAULT_GAME_SETTINGS.trainBreakdown.manualStepsPerPress;
+  return Number.isFinite(configuredSteps) && configuredSteps >= 1
+    ? Math.round(configuredSteps)
+    : fallbackSteps;
+}
+
+function getBreakdownMotionThreshold() {
+  const configuredThreshold = Number(TRAIN_BREAKDOWN_CONFIG.motionThreshold);
+  const fallbackThreshold = DEFAULT_GAME_SETTINGS.trainBreakdown.motionThreshold;
+  return Number.isFinite(configuredThreshold) && configuredThreshold > 0
+    ? configuredThreshold
+    : fallbackThreshold;
+}
+
+function getBreakdownMotionResetThreshold() {
+  const configuredThreshold = Number(TRAIN_BREAKDOWN_CONFIG.motionResetThreshold);
+  const fallbackThreshold = DEFAULT_GAME_SETTINGS.trainBreakdown.motionResetThreshold;
+  return Number.isFinite(configuredThreshold) && configuredThreshold > 0
+    ? configuredThreshold
+    : fallbackThreshold;
+}
+
+function getBreakdownMinStepInterval() {
+  const configuredInterval = Number(TRAIN_BREAKDOWN_CONFIG.minStepInterval);
+  const fallbackInterval = DEFAULT_GAME_SETTINGS.trainBreakdown.minStepInterval;
+  return Number.isFinite(configuredInterval) && configuredInterval >= 0
+    ? configuredInterval
+    : fallbackInterval;
 }
 
 function getTrainDelayChance() {
@@ -812,6 +901,131 @@ function getAuntieVignetteLevel() {
   }
 
   return clamp(state.auntieOpenElapsed / getAuntieScoldAfter(), 0, 1);
+}
+
+function resetTrainBreakdown() {
+  state.breakdownActive = false;
+  state.breakdownSteps = 0;
+  state.breakdownTargetSteps = 0;
+  state.breakdownStartProgress = 0;
+  state.breakdownTargetElapsed = 0;
+  state.breakdownDestination = null;
+  state.stepMotionPeakActive = false;
+  state.lastStepAt = Number.NEGATIVE_INFINITY;
+  state.lastStepMotionAt = 0;
+}
+
+function getBreakdownStepProgress() {
+  if (!state.breakdownActive || state.breakdownTargetSteps <= 0) {
+    return 0;
+  }
+
+  return clamp(state.breakdownSteps / state.breakdownTargetSteps, 0, 1);
+}
+
+function getBreakdownRouteProgress() {
+  const stepProgress = getBreakdownStepProgress();
+  return clamp(
+    state.breakdownStartProgress + (1 - state.breakdownStartProgress) * stepProgress,
+    0,
+    1,
+  );
+}
+
+function addBreakdownSteps(steps) {
+  if (!state.breakdownActive) {
+    return;
+  }
+
+  const addedSteps = Number(steps);
+
+  if (!Number.isFinite(addedSteps) || addedSteps <= 0) {
+    return;
+  }
+
+  state.breakdownSteps = Math.min(
+    state.breakdownTargetSteps,
+    state.breakdownSteps + Math.round(addedSteps),
+  );
+
+  if (state.breakdownSteps >= state.breakdownTargetSteps) {
+    completeTrainBreakdownWalk();
+  }
+}
+
+function completeTrainBreakdownWalk() {
+  if (!state.breakdownActive) {
+    return;
+  }
+
+  const targetElapsed = clamp(state.breakdownTargetElapsed, 0, DURATIONS.ride);
+  const reachedStation = state.breakdownDestination;
+  resetTrainBreakdown();
+  state.seated = false;
+  state.rideRemaining = Math.max(0, DURATIONS.ride - targetElapsed);
+  state.lastTick = performance.now();
+  state.lastActionKey = "none:false";
+  vibrate(VIBRATION_CONFIG.standing);
+
+  if (state.rideRemaining <= 0) {
+    finishRide();
+    return;
+  }
+
+  trainSoundscape.start(performance.now());
+  showStatusText(`Reached ${reachedStation?.name ?? "the station"}!`, "success");
+  render();
+}
+
+function startTrainBreakdown(stationSegment) {
+  if (state.breakdownActive || stationSegment.mode !== "travel") {
+    return;
+  }
+
+  resetAuntieEvent();
+  clearStationSeatOffer();
+  state.seated = false;
+  state.breakdownActive = true;
+  state.breakdownSteps = 0;
+  state.breakdownTargetSteps = getTrainBreakdownTargetSteps();
+  state.breakdownStartProgress = stationSegment.progress;
+  state.breakdownTargetElapsed = getRideElapsed() + stationSegment.remaining;
+  state.breakdownDestination = stationSegment.next;
+  state.stepMotionPeakActive = false;
+  state.lastActionKey = "none:false";
+  trainSoundscape.stop();
+  playTrainBreakdownSound();
+  vibrate(VIBRATION_CONFIG.standing);
+  showStatusText(`Train broke down! Walk to ${stationSegment.next.name}.`, "danger");
+}
+
+function maybeStartTrainBreakdown(stationSegment) {
+  if (
+    state.phase !== "riding" ||
+    state.breakdownActive ||
+    stationSegment.mode !== "travel"
+  ) {
+    return false;
+  }
+
+  const key = getStationAnnouncementKey(
+    stationSegment.next,
+    "breakdown",
+    stationSegment.legIndex,
+  );
+
+  if (state.breakdownSegmentsChecked.has(key)) {
+    return false;
+  }
+
+  state.breakdownSegmentsChecked.add(key);
+
+  if (Math.random() >= getTrainBreakdownChance()) {
+    return false;
+  }
+
+  startTrainBreakdown(stationSegment);
+  return true;
 }
 
 function extendStationDwell(stationSegment, extensionDuration) {
@@ -1088,6 +1302,11 @@ function populateSettingsForm() {
   setSettingInputValue("startSound.volume", ratioToPercent(START_SOUND_CONFIG.volume));
   setSettingInputValue("endSound.volume", ratioToPercent(END_SOUND_CONFIG.volume));
   setSettingInputValue("auntieSound.volume", ratioToPercent(AUNTIE_SOUND_CONFIG.volume));
+  setSettingInputValue("trainBreakdown.chance", ratioToPercent(getTrainBreakdownChance()));
+  setSettingInputValue("trainBreakdown.minSteps", getTrainBreakdownMinSteps());
+  setSettingInputValue("trainBreakdown.maxSteps", getTrainBreakdownMaxSteps());
+  setSettingInputValue("trainBreakdown.manualStepsPerPress", getBreakdownManualStepsPerPress());
+  setSettingInputValue("trainBreakdown.volume", ratioToPercent(TRAIN_BREAKDOWN_CONFIG.volume));
   setSettingInputValue("trainDelay.chance", ratioToPercent(getTrainDelayChance()));
   setSettingInputValue(
     "trainDelay.extensionDuration",
@@ -1236,6 +1455,34 @@ function readSettingsForm() {
     auntieSound: {
       volume: percentToRatio(
         readSettingNumber("auntieSound.volume", ratioToPercent(AUNTIE_SOUND_CONFIG.volume)),
+      ),
+    },
+    trainBreakdown: {
+      chance: percentToRatio(
+        readSettingNumber("trainBreakdown.chance", ratioToPercent(getTrainBreakdownChance())),
+      ),
+      minSteps: Math.max(
+        1,
+        Math.round(readSettingNumber("trainBreakdown.minSteps", getTrainBreakdownMinSteps())),
+      ),
+      maxSteps: Math.max(
+        1,
+        Math.round(readSettingNumber("trainBreakdown.maxSteps", getTrainBreakdownMaxSteps())),
+      ),
+      manualStepsPerPress: Math.max(
+        1,
+        Math.round(
+          readSettingNumber(
+            "trainBreakdown.manualStepsPerPress",
+            getBreakdownManualStepsPerPress(),
+          ),
+        ),
+      ),
+      volume: percentToRatio(
+        readSettingNumber(
+          "trainBreakdown.volume",
+          ratioToPercent(TRAIN_BREAKDOWN_CONFIG.volume),
+        ),
       ),
     },
     trainDelay: {
@@ -1533,6 +1780,7 @@ function getTrainSoundEffects() {
 let activeStartSound = null;
 let activeEndSound = null;
 let activeAuntieSound = null;
+let activeTrainBreakdownSound = null;
 let activeTrainDelaySound = null;
 
 function clearStartSound(immediate = false) {
@@ -1590,6 +1838,22 @@ function clearTrainDelaySound(immediate = false) {
 
   const audio = activeTrainDelaySound;
   activeTrainDelaySound = null;
+
+  if (immediate) {
+    disposeAudio(audio);
+    return;
+  }
+
+  stopAudioWithFade(audio, () => disposeAudio(audio));
+}
+
+function clearTrainBreakdownSound(immediate = false) {
+  if (!activeTrainBreakdownSound) {
+    return;
+  }
+
+  const audio = activeTrainBreakdownSound;
+  activeTrainBreakdownSound = null;
 
   if (immediate) {
     disposeAudio(audio);
@@ -1827,6 +2091,99 @@ function unlockTrainDelaySound() {
       .catch((error) => {
         disposeAudio(primer);
         logSoundDebug("Train delay sound unlock failed.", {
+          src,
+          error: error?.message ?? String(error),
+        });
+      });
+  } else {
+    disposeAudio(primer);
+  }
+}
+
+function playTrainBreakdownSound() {
+  const src =
+    typeof TRAIN_BREAKDOWN_CONFIG.src === "string" ? TRAIN_BREAKDOWN_CONFIG.src.trim() : "";
+
+  if (!src) {
+    logSoundDebug("Train breakdown sound skipped; no source configured.");
+    return;
+  }
+
+  clearTrainBreakdownSound();
+  logSoundDebug("Playing train breakdown sound.", { src });
+
+  const audio = new Audio(src);
+  const targetVolume = prepareAudioForPlayback(audio, TRAIN_BREAKDOWN_CONFIG.volume ?? 1);
+  audio.preload = "auto";
+  audio.playsInline = true;
+  activeTrainBreakdownSound = audio;
+
+  audio.addEventListener("ended", () => {
+    if (activeTrainBreakdownSound === audio) {
+      activeTrainBreakdownSound = null;
+    }
+
+    disposeAudio(audio);
+  });
+
+  audio.addEventListener("error", () => {
+    if (activeTrainBreakdownSound === audio) {
+      activeTrainBreakdownSound = null;
+    }
+
+    disposeAudio(audio);
+    logSoundDebug("Train breakdown sound failed to load.", { src });
+  });
+
+  const playAttempt = audio.play();
+
+  if (playAttempt) {
+    playAttempt
+      .then(() => {
+        startAudioFades(audio, targetVolume);
+        logSoundDebug("Train breakdown sound playback started.", { src });
+      })
+      .catch((error) => {
+        logSoundDebug("Train breakdown sound playback was blocked or failed.", {
+          src,
+          error: error?.message ?? String(error),
+        });
+        if (activeTrainBreakdownSound === audio) {
+          activeTrainBreakdownSound = null;
+        }
+        disposeAudio(audio);
+      });
+  }
+}
+
+function unlockTrainBreakdownSound() {
+  const src =
+    typeof TRAIN_BREAKDOWN_CONFIG.src === "string" ? TRAIN_BREAKDOWN_CONFIG.src.trim() : "";
+
+  if (!src) {
+    logSoundDebug("Train breakdown sound unlock skipped; no source configured.");
+    return;
+  }
+
+  const primer = new Audio(src);
+  primer.volume = 0;
+  primer.muted = true;
+  primer.preload = "auto";
+  primer.playsInline = true;
+
+  const playAttempt = primer.play();
+
+  if (playAttempt) {
+    playAttempt
+      .then(() => {
+        primer.pause();
+        primer.currentTime = 0;
+        disposeAudio(primer);
+        logSoundDebug("Train breakdown sound unlocked.", { src });
+      })
+      .catch((error) => {
+        disposeAudio(primer);
+        logSoundDebug("Train breakdown sound unlock failed.", {
           src,
           error: error?.message ?? String(error),
         });
@@ -2413,6 +2770,10 @@ function canUseRealMotion() {
   return "DeviceOrientationEvent" in window;
 }
 
+function canUseStepMotion() {
+  return "DeviceMotionEvent" in window;
+}
+
 function realMotionIsFresh(now = performance.now()) {
   return (
     state.orientation.beta !== null &&
@@ -2462,7 +2823,7 @@ function phaseNeedsUpright() {
     return false;
   }
 
-  return state.phase === "riding" && !state.seated;
+  return state.phase === "riding" && !state.seated && !state.breakdownActive;
 }
 
 function countdownCanMove(now) {
@@ -2500,6 +2861,26 @@ async function requestMotionAccess() {
   }
 }
 
+async function requestStepMotionAccess() {
+  if (!canUseStepMotion()) {
+    state.stepMotionPermission = "fallback";
+    return;
+  }
+
+  const eventConstructor = window.DeviceMotionEvent;
+
+  if (typeof eventConstructor.requestPermission === "function") {
+    try {
+      state.stepMotionPermission = await eventConstructor.requestPermission();
+    } catch {
+      state.stepMotionPermission = "denied";
+    }
+    return;
+  }
+
+  state.stepMotionPermission = "granted";
+}
+
 function handleOrientation(event) {
   state.orientation.beta = event.beta;
   state.orientation.gamma = event.gamma;
@@ -2510,10 +2891,63 @@ function handleOrientation(event) {
   }
 }
 
+function readMotionMagnitude(event) {
+  const acceleration = event.accelerationIncludingGravity ?? event.acceleration;
+
+  if (!acceleration) {
+    return null;
+  }
+
+  const x = Number(acceleration.x);
+  const y = Number(acceleration.y);
+  const z = Number(acceleration.z);
+
+  if (![x, y, z].every(Number.isFinite)) {
+    return null;
+  }
+
+  return Math.sqrt(x * x + y * y + z * z);
+}
+
+function handleDeviceMotion(event) {
+  const now = performance.now();
+  state.lastStepMotionAt = now;
+
+  if (state.stepMotionPermission === "unknown") {
+    state.stepMotionPermission = "granted";
+  }
+
+  if (!state.breakdownActive) {
+    return;
+  }
+
+  const magnitude = readMotionMagnitude(event);
+
+  if (magnitude === null) {
+    return;
+  }
+
+  if (magnitude <= getBreakdownMotionResetThreshold()) {
+    state.stepMotionPeakActive = false;
+    return;
+  }
+
+  if (
+    magnitude >= getBreakdownMotionThreshold() &&
+    !state.stepMotionPeakActive &&
+    now - state.lastStepAt >= getBreakdownMinStepInterval()
+  ) {
+    state.stepMotionPeakActive = true;
+    state.lastStepAt = now;
+    addBreakdownSteps(1);
+  }
+}
+
 function stopAllAudio(immediate = false) {
   clearStartSound(immediate);
   clearEndSound(immediate);
   clearAuntieSound(immediate);
+  clearTrainBreakdownSound(immediate);
   clearTrainDelaySound(immediate);
   trainSoundscape.stop(immediate);
   stationAnnouncementPlayer.stop(immediate);
@@ -2554,6 +2988,7 @@ function skipRidingToNextStation() {
   state.lastActionKey = "none:false";
   resetAuntieEvent();
   clearStationSeatOffer();
+  resetTrainBreakdown();
 
   if (state.rideRemaining <= 0) {
     finishRide();
@@ -2650,6 +3085,7 @@ function resetState() {
   clearStartSound();
   clearEndSound();
   clearAuntieSound();
+  clearTrainBreakdownSound();
   clearTrainDelaySound();
   trainSoundscape.stop();
   stationAnnouncementPlayer.stop();
@@ -2665,9 +3101,11 @@ function resetState() {
   state.nextStationAnnouncementsPlayed = new Set();
   state.arrivingAnnouncementsPlayed = new Set();
   state.doorClosingAnnouncementsPlayed = new Set();
+  state.breakdownSegmentsChecked = new Set();
   state.trainDelayStationsChecked = new Set();
   state.seatOfferStationsChecked = new Set();
   state.auntieDeparturesChecked = new Set();
+  resetTrainBreakdown();
   resetAuntieEvent();
   state.lastActionKey = "none:false";
   state.simulatedUpright = true;
@@ -2680,6 +3118,7 @@ function startWaiting() {
   hideStatusText(true);
   clearEndSound();
   clearAuntieSound();
+  clearTrainBreakdownSound();
   clearTrainDelaySound();
   trainSoundscape.stop();
   stationAnnouncementPlayer.stop();
@@ -2695,9 +3134,11 @@ function startWaiting() {
   state.nextStationAnnouncementsPlayed = new Set();
   state.arrivingAnnouncementsPlayed = new Set();
   state.doorClosingAnnouncementsPlayed = new Set();
+  state.breakdownSegmentsChecked = new Set();
   state.trainDelayStationsChecked = new Set();
   state.seatOfferStationsChecked = new Set();
   state.auntieDeparturesChecked = new Set();
+  resetTrainBreakdown();
   resetAuntieEvent();
   state.lastActionKey = "none:false";
   state.uprightCheck.checkedAt = Number.NEGATIVE_INFINITY;
@@ -2723,18 +3164,25 @@ function startRide(seated) {
   state.nextStationAnnouncementsPlayed = new Set();
   state.arrivingAnnouncementsPlayed = new Set();
   state.doorClosingAnnouncementsPlayed = new Set();
+  state.breakdownSegmentsChecked = new Set();
   state.trainDelayStationsChecked = new Set();
   state.seatOfferStationsChecked = new Set();
   clearStationSeatOffer();
   state.auntieDeparturesChecked = new Set();
+  resetTrainBreakdown();
   resetAuntieEvent();
-  playDueNextStationAnnouncement();
-  trainSoundscape.start();
-  vibrate(seated ? VIBRATION_CONFIG.seated : VIBRATION_CONFIG.standing);
-  showStatusText(
-    seated ? "Seat secured!" : "Failed to get a seat! Standing it shall be...",
-    seated ? "success" : "danger",
-  );
+  const stationSegment = getStationSegment();
+
+  if (!maybeStartTrainBreakdown(stationSegment)) {
+    playDueNextStationAnnouncement();
+    trainSoundscape.start();
+    vibrate(seated ? VIBRATION_CONFIG.seated : VIBRATION_CONFIG.standing);
+    showStatusText(
+      seated ? "Seat secured!" : "Failed to get a seat! Standing it shall be...",
+      seated ? "success" : "danger",
+    );
+  }
+
   render();
 }
 
@@ -2743,6 +3191,7 @@ function finishRide() {
   resetAuntieEvent();
   clearStationSeatOffer();
   clearAuntieSound();
+  clearTrainBreakdownSound();
   clearTrainDelaySound();
   trainSoundscape.stop();
   state.phase = "arrived";
@@ -2900,27 +3349,38 @@ function tick(now) {
         startRide(state.seatProgress >= SEAT_RUSH_CONFIG.seatThreshold);
       }
     } else if (state.phase === "riding") {
-      state.rideRemaining -= elapsed;
-      let stationSegment = getStationSegment();
+      if (state.breakdownActive) {
+        // Walking progress replaces train movement during a breakdown.
+      } else {
+        state.rideRemaining -= elapsed;
+        let stationSegment = getStationSegment();
 
-      if (maybeStartTrainDelay(stationSegment)) {
-        stationSegment = getStationSegment();
-      }
+        if (maybeStartTrainBreakdown(stationSegment)) {
+          stationSegment = getStationSegment();
+        }
 
-      maybeStartStationSeatOffer(stationSegment);
-      updateStationSeatOffer(elapsed, stationSegment);
-      playDueNextStationAnnouncement();
-      playDueArrivingAnnouncement();
-      playDueDoorClosingSound();
-      updateAuntieEvent(elapsed);
+        if (!state.breakdownActive) {
+          playDueNextStationAnnouncement();
 
-      if (state.rideRemaining <= 0) {
-        finishRide();
+          if (maybeStartTrainDelay(stationSegment)) {
+            stationSegment = getStationSegment();
+          }
+
+          maybeStartStationSeatOffer(stationSegment);
+          updateStationSeatOffer(elapsed, stationSegment);
+          playDueArrivingAnnouncement();
+          playDueDoorClosingSound();
+          updateAuntieEvent(elapsed);
+
+          if (state.rideRemaining <= 0) {
+            finishRide();
+          }
+        }
       }
     }
   }
 
-  trainSoundscape.tick(now, canMove);
+  trainSoundscape.tick(now, canMove && !state.breakdownActive);
   render();
   requestAnimationFrame(tick);
 }
@@ -3010,7 +3470,8 @@ function renderStationSegment() {
   const stationSegment = getStationSegment();
   currentStationNameEl.textContent = stationSegment.current.name;
   nextStationNameEl.textContent = stationSegment.next.name;
-  segmentProgressEl.style.width = `${Math.round(stationSegment.progress * 100)}%`;
+  const progress = state.breakdownActive ? getBreakdownRouteProgress() : stationSegment.progress;
+  segmentProgressEl.style.width = `${Math.round(progress * 100)}%`;
 }
 
 function renderAuntieEvent() {
@@ -3080,6 +3541,14 @@ function renderPhaseCopy(paused, upright) {
     return;
   }
 
+  if (state.phase === "riding" && state.breakdownActive) {
+    const destination = state.breakdownDestination ?? getStationSegment().next;
+    statusRibbonEl.classList.add("danger");
+    statusRibbonEl.textContent = "Train breakdown";
+    messageEl.textContent = `Walk to ${destination.name}.`;
+    return;
+  }
+
   if (state.phase === "riding" && !state.seated && state.seatOfferActive) {
     const stationSegment = getStationSegment();
     statusRibbonEl.classList.add("success");
@@ -3134,6 +3603,14 @@ function getActionState(now = performance.now()) {
       enabled: countdownCanMove(now),
       label: `SNATCH SEAT!!! ${formatTime(state.seatOfferRemaining)}`,
       type: "rush",
+    };
+  }
+
+  if (state.phase === "riding" && state.breakdownActive) {
+    return {
+      enabled: true,
+      label: `WALK ${state.breakdownSteps}/${state.breakdownTargetSteps}`,
+      type: "walk",
     };
   }
 
@@ -3212,6 +3689,8 @@ function triggerAction() {
     }
 
     rush();
+  } else if (action.type === "walk") {
+    addBreakdownSteps(getBreakdownManualStepsPerPress());
   } else if (action.type === "sound") {
     stationAnnouncementPlayer.enableFromGesture();
     doorClosingPlayer.enableFromGesture();
@@ -3245,11 +3724,12 @@ function renderActions() {
 startButtonEl.addEventListener("click", async () => {
   playStartSound();
   unlockAuntieSound();
+  unlockTrainBreakdownSound();
   unlockTrainDelaySound();
   stationAnnouncementPlayer.unlock();
   doorClosingPlayer.unlock();
   trainSoundscape.unlock();
-  await requestMotionAccess();
+  await Promise.all([requestMotionAccess(), requestStepMotionAccess()]);
   startWaiting();
 });
 
@@ -3287,6 +3767,7 @@ sensorFallbackEl.addEventListener("click", () => {
 });
 
 window.addEventListener("deviceorientation", handleOrientation);
+window.addEventListener("devicemotion", handleDeviceMotion);
 
 window.addEventListener("keydown", (event) => {
   if (event.key.toLowerCase() === "u") {
