@@ -257,6 +257,7 @@ const state = {
   rideRemaining: DURATIONS.ride,
   seatProgress: 0,
   seated: false,
+  nextStationAnnouncementsPlayed: new Set(),
   arrivingAnnouncementsPlayed: new Set(),
   doorClosingAnnouncementsPlayed: new Set(),
   lastActionKey: "none:false",
@@ -406,6 +407,15 @@ function clampVolume(volume) {
   return Math.min(1, Math.max(0, numericVolume));
 }
 
+function logSoundDebug(message, detail = undefined) {
+  if (detail === undefined) {
+    console.info(`[Train to Bishan sound] ${message}`);
+    return;
+  }
+
+  console.info(`[Train to Bishan sound] ${message}`, detail);
+}
+
 function getTrainSoundEffects() {
   const configuredEffects = Array.isArray(window.TRAIN_SOUND_EFFECTS)
     ? window.TRAIN_SOUND_EFFECTS
@@ -449,10 +459,12 @@ function playStartSound() {
   const src = typeof START_SOUND_CONFIG.src === "string" ? START_SOUND_CONFIG.src.trim() : "";
 
   if (!src) {
+    logSoundDebug("Start sound skipped; no source configured.");
     return;
   }
 
   clearStartSound();
+  logSoundDebug("Playing start sound.", { src });
 
   const audio = new Audio(src);
   audio.volume = clampVolume(START_SOUND_CONFIG.volume ?? 1);
@@ -464,22 +476,34 @@ function playStartSound() {
     if (activeStartSound === audio) {
       activeStartSound = null;
     }
+
+    logSoundDebug("Start sound ended.", { src });
   });
 
   audio.addEventListener("error", () => {
     if (activeStartSound === audio) {
       activeStartSound = null;
     }
+
+    logSoundDebug("Start sound failed to load.", { src });
   });
 
   const playAttempt = audio.play();
 
   if (playAttempt) {
-    playAttempt.catch(() => {
-      if (activeStartSound === audio) {
-        activeStartSound = null;
-      }
-    });
+    playAttempt
+      .then(() => {
+        logSoundDebug("Start sound playback started.", { src });
+      })
+      .catch((error) => {
+        logSoundDebug("Start sound playback was blocked or failed.", {
+          src,
+          error: error?.message ?? String(error),
+        });
+        if (activeStartSound === audio) {
+          activeStartSound = null;
+        }
+      });
   }
 }
 
@@ -520,6 +544,7 @@ function createDoorClosingSoundPlayer() {
     },
     unlock() {
       if (!this.hasSound()) {
+        logSoundDebug("Door closing sound unlock skipped; no source configured.");
         return;
       }
 
@@ -531,8 +556,14 @@ function createDoorClosingSoundPlayer() {
           .then(() => {
             primer.pause();
             primer.currentTime = 0;
+            logSoundDebug("Door closing sound unlocked.", { src: getSrc() });
           })
-          .catch(() => {});
+          .catch((error) => {
+            logSoundDebug("Door closing sound unlock failed.", {
+              src: getSrc(),
+              error: error?.message ?? String(error),
+            });
+          });
       }
     },
     stop() {
@@ -542,12 +573,14 @@ function createDoorClosingSoundPlayer() {
     },
     play() {
       if (!this.hasSound()) {
+        logSoundDebug("Door closing sound skipped; no source configured.");
         return;
       }
 
       pending = true;
       this.blocked = false;
       clearActiveAudio();
+      logSoundDebug("Playing door closing sound.", { src: getSrc() });
 
       const audio = createAudio();
       activeAudio = audio;
@@ -556,6 +589,8 @@ function createDoorClosingSoundPlayer() {
         if (activeAudio === audio) {
           activeAudio = null;
         }
+
+        logSoundDebug("Door closing sound ended.", { src: getSrc() });
       });
 
       audio.addEventListener("error", () => {
@@ -564,6 +599,7 @@ function createDoorClosingSoundPlayer() {
         }
 
         pending = false;
+        logSoundDebug("Door closing sound failed to load.", { src: getSrc() });
       });
 
       const playAttempt = audio.play();
@@ -572,15 +608,24 @@ function createDoorClosingSoundPlayer() {
         playAttempt
           .then(() => {
             pending = false;
+            logSoundDebug("Door closing sound playback started.", { src: getSrc() });
           })
           .catch((error) => {
             clearActiveAudio();
 
             if (error?.name === "NotAllowedError") {
               this.blocked = true;
+              logSoundDebug("Door closing sound blocked by browser.", {
+                src: getSrc(),
+                error: error.message,
+              });
               render();
             } else {
               pending = false;
+              logSoundDebug("Door closing sound playback failed.", {
+                src: getSrc(),
+                error: error?.message ?? String(error),
+              });
             }
           });
       }
@@ -649,6 +694,7 @@ function createStationAnnouncementPlayer() {
     blocked: false,
     unlock() {
       const primer = createAudio(getFirstNextStation(), "next", true);
+      logSoundDebug("Unlocking station announcement audio.", { src: primer.src });
       const playAttempt = primer.play();
 
       if (playAttempt) {
@@ -656,8 +702,14 @@ function createStationAnnouncementPlayer() {
           .then(() => {
             primer.pause();
             primer.currentTime = 0;
+            logSoundDebug("Station announcement audio unlocked.", { src: primer.src });
           })
-          .catch(() => {});
+          .catch((error) => {
+            logSoundDebug("Station announcement unlock failed.", {
+              src: primer.src,
+              error: error?.message ?? String(error),
+            });
+          });
       }
     },
     stop() {
@@ -672,9 +724,20 @@ function createStationAnnouncementPlayer() {
 
       const audio = createAudio(station, type);
       activeAudio.add(audio);
+      const src = audio.src;
+      logSoundDebug("Playing station announcement.", {
+        type,
+        station: station.name,
+        src,
+      });
 
       audio.addEventListener("ended", () => {
         clearAudio(audio);
+        logSoundDebug("Station announcement ended.", {
+          type,
+          station: station.name,
+          src,
+        });
       });
 
       audio.addEventListener("error", () => {
@@ -683,6 +746,11 @@ function createStationAnnouncementPlayer() {
         }
 
         clearAudio(audio);
+        logSoundDebug("Station announcement failed to load.", {
+          type,
+          station: station.name,
+          src,
+        });
       });
 
       const playAttempt = audio.play();
@@ -693,15 +761,39 @@ function createStationAnnouncementPlayer() {
             if (isPending(station, type)) {
               pendingAnnouncement = null;
             }
+            logSoundDebug("Station announcement playback started.", {
+              type,
+              station: station.name,
+              src,
+            });
           })
           .catch((error) => {
             clearAudio(audio);
 
             if (error?.name === "NotAllowedError") {
               this.blocked = true;
+              logSoundDebug("Station announcement blocked by browser.", {
+                type,
+                station: station.name,
+                src,
+                error: error.message,
+              });
               render();
             } else if (isPending(station, type)) {
               pendingAnnouncement = null;
+              logSoundDebug("Station announcement playback failed.", {
+                type,
+                station: station.name,
+                src,
+                error: error?.message ?? String(error),
+              });
+            } else {
+              logSoundDebug("Station announcement playback failed.", {
+                type,
+                station: station.name,
+                src,
+                error: error?.message ?? String(error),
+              });
             }
           });
       }
@@ -752,6 +844,7 @@ function createTrainSoundscape() {
       refresh();
 
       if (effects.length === 0) {
+        logSoundDebug("Random train sound unlock skipped; playlist is empty.");
         return;
       }
 
@@ -768,8 +861,14 @@ function createTrainSoundscape() {
           .then(() => {
             primer.pause();
             primer.currentTime = 0;
+            logSoundDebug("Random train sound audio unlocked.", { src: effects[0].src });
           })
-          .catch(() => {});
+          .catch((error) => {
+            logSoundDebug("Random train sound unlock failed.", {
+              src: effects[0].src,
+              error: error?.message ?? String(error),
+            });
+          });
       }
     },
     start(now = performance.now()) {
@@ -780,6 +879,7 @@ function createTrainSoundscape() {
         TRAIN_SOUND_CONFIG.firstMinDelay,
         TRAIN_SOUND_CONFIG.firstMaxDelay,
       );
+      logSoundDebug("Random train soundscape started.", { sounds: effects.length });
     },
     stop() {
       this.nextAt = Number.POSITIVE_INFINITY;
@@ -790,6 +890,11 @@ function createTrainSoundscape() {
       refresh();
       this.nextAt =
         effects.length === 0 ? Number.POSITIVE_INFINITY : now + randomBetween(min, max);
+      if (effects.length > 0) {
+        logSoundDebug("Scheduled next random train sound.", {
+          delayMs: Math.round(this.nextAt - now),
+        });
+      }
     },
     tick(now, canPlay) {
       if (state.phase !== "riding" || !canPlay || effects.length === 0) {
@@ -805,10 +910,14 @@ function createTrainSoundscape() {
       refresh();
 
       if (effects.length === 0) {
+        logSoundDebug("Random train sound skipped; playlist is empty.");
         return;
       }
 
       if (activeAudio.size >= TRAIN_SOUND_CONFIG.maxConcurrent) {
+        logSoundDebug("Random train sound delayed; max concurrent sounds active.", {
+          active: activeAudio.size,
+        });
         this.scheduleNext(
           performance.now(),
           TRAIN_SOUND_CONFIG.retryMinDelay,
@@ -819,23 +928,47 @@ function createTrainSoundscape() {
 
       const effect = effects[Math.floor(Math.random() * effects.length)];
       const audio = new Audio(effect.src);
+      const src = effect.src;
       audio.volume = effect.volume;
       audio.preload = "auto";
       audio.playsInline = true;
 
-      audio.addEventListener("ended", () => clearAudio(audio), { once: true });
-      audio.addEventListener("error", () => clearAudio(audio), { once: true });
+      audio.addEventListener(
+        "ended",
+        () => {
+          clearAudio(audio);
+          logSoundDebug("Random train sound ended.", { src });
+        },
+        { once: true },
+      );
+      audio.addEventListener(
+        "error",
+        () => {
+          clearAudio(audio);
+          logSoundDebug("Random train sound failed to load.", { src });
+        },
+        { once: true },
+      );
 
       activeAudio.add(audio);
+      logSoundDebug("Playing random train sound.", { src });
 
       const playAttempt = audio.play();
 
       if (playAttempt) {
-        playAttempt.catch(() => {
-          this.blocked = true;
-          clearAudio(audio);
-          render();
-        });
+        playAttempt
+          .then(() => {
+            logSoundDebug("Random train sound playback started.", { src });
+          })
+          .catch((error) => {
+            this.blocked = true;
+            clearAudio(audio);
+            logSoundDebug("Random train sound blocked or failed.", {
+              src,
+              error: error?.message ?? String(error),
+            });
+            render();
+          });
       }
     },
     enableFromGesture() {
@@ -977,6 +1110,7 @@ function resetState() {
   resetCountdowns();
   state.seatProgress = 0;
   state.seated = false;
+  state.nextStationAnnouncementsPlayed = new Set();
   state.arrivingAnnouncementsPlayed = new Set();
   state.doorClosingAnnouncementsPlayed = new Set();
   state.lastActionKey = "none:false";
@@ -993,6 +1127,7 @@ function startWaiting() {
   resetCountdowns();
   state.seatProgress = 0;
   state.seated = false;
+  state.nextStationAnnouncementsPlayed = new Set();
   state.arrivingAnnouncementsPlayed = new Set();
   state.doorClosingAnnouncementsPlayed = new Set();
   state.lastActionKey = "none:false";
@@ -1012,9 +1147,10 @@ function startRide(seated) {
   state.phase = "riding";
   state.seated = seated;
   state.rideRemaining = DURATIONS.ride;
+  state.nextStationAnnouncementsPlayed = new Set();
   state.arrivingAnnouncementsPlayed = new Set();
   state.doorClosingAnnouncementsPlayed = new Set();
-  stationAnnouncementPlayer.playNextStation(getFirstNextStation());
+  playDueNextStationAnnouncement();
   trainSoundscape.start();
   vibrate(seated ? VIBRATION_CONFIG.seated : VIBRATION_CONFIG.standing);
   render();
@@ -1076,6 +1212,31 @@ function playDueArrivingAnnouncement() {
 
   state.arrivingAnnouncementsPlayed.add(key);
   stationAnnouncementPlayer.playArrivingAtStation(stationSegment.next);
+}
+
+function playDueNextStationAnnouncement() {
+  if (state.phase !== "riding") {
+    return;
+  }
+
+  const stationSegment = getStationSegment();
+
+  if (stationSegment.mode !== "travel") {
+    return;
+  }
+
+  const key = getStationAnnouncementKey(
+    stationSegment.next,
+    "next",
+    stationSegment.legIndex,
+  );
+
+  if (state.nextStationAnnouncementsPlayed.has(key)) {
+    return;
+  }
+
+  state.nextStationAnnouncementsPlayed.add(key);
+  stationAnnouncementPlayer.playNextStation(stationSegment.next);
 }
 
 function playDueDoorClosingSound() {
@@ -1141,6 +1302,7 @@ function tick(now) {
       }
     } else if (state.phase === "riding") {
       state.rideRemaining -= elapsed;
+      playDueNextStationAnnouncement();
       playDueArrivingAnnouncement();
       playDueDoorClosingSound();
 
