@@ -3498,6 +3498,16 @@ function renderStationSegment() {
   segmentProgressEl.style.width = `${Math.round(progress * 100)}%`;
 }
 
+function getRideStatusText() {
+  const stationSegment = getStationSegment();
+
+  if (stationSegment.mode === "dwell") {
+    return `Currently stopping at ${stationSegment.current.name}`;
+  }
+
+  return `Going from ${stationSegment.current.name} to ${stationSegment.next.name}`;
+}
+
 function renderAuntieEvent() {
   const auntieDangerLevel = getAuntieVignetteLevel();
   const auntieShakeDistance = Math.round((1 + auntieDangerLevel * 6) * 100) / 100;
@@ -3595,13 +3605,13 @@ function renderPhaseCopy(paused, upright) {
   }
 
   if (state.phase === "riding" && state.seated) {
-    statusRibbonEl.textContent = `On board to ${destination.name}`;
+    statusRibbonEl.textContent = getRideStatusText();
     messageEl.textContent = "You can rest the phone while the ride continues.";
     return;
   }
 
   if (state.phase === "riding") {
-    statusRibbonEl.textContent = `On board to ${destination.name}`;
+    statusRibbonEl.textContent = getRideStatusText();
     messageEl.textContent = usesUprightCheck
       ? `Keep the phone upright until ${destination.name}.`
       : "Ride it out standing until a seat becomes available.";
