@@ -54,6 +54,10 @@
             <span class="material-symbols-rounded" aria-hidden="true">settings</span>
             Settings
           </button>
+          <button class="secondary icon-text-button" id="creditsButton" type="button">
+            <span class="material-symbols-rounded" aria-hidden="true">attribution</span>
+            Credits
+          </button>
         </div>
       </section>
 
@@ -298,6 +302,40 @@
         <div class="settings-actions">
           <button class="secondary" id="settingsResetButton" type="button">Reset</button>
           <button class="primary" type="submit" form="settingsForm">Save</button>
+        </div>
+      </section>
+
+      <section class="credits-screen screen" id="creditsScreen" aria-label="Train to Bishan credits" hidden>
+        <header class="settings-header">
+          <button
+            class="icon-button material-symbols-rounded"
+            id="creditsBackButton"
+            type="button"
+            aria-label="Back to main screen"
+          >
+            arrow_back
+          </button>
+          <div>
+            <span class="line-code">Credits</span>
+            <h2>Credits</h2>
+          </div>
+        </header>
+
+        <div class="credits-content">
+          <section>
+            <h3>Made by</h3>
+            <p>[Add our names here]</p>
+          </section>
+
+          <section>
+            <h3>Audio</h3>
+            <p>
+              Audio credited to
+              <a href="https://www.youtube.com/watch?v=MxowOzkYy1Q" target="_blank" rel="noopener noreferrer">
+                this YouTube creator
+              </a>.
+            </p>
+          </section>
         </div>
       </section>
 
