@@ -1152,6 +1152,14 @@ function failStationSeatOffer() {
   showStatusText("Failed to get a seat! Standing it shall be...", "danger");
 }
 
+function resolveStationSeatOffer() {
+  if (state.seatProgress >= SEAT_RUSH_CONFIG.seatThreshold) {
+    secureStationSeatOffer();
+  } else {
+    failStationSeatOffer();
+  }
+}
+
 function updateStationSeatOffer(elapsed, stationSegment) {
   if (!state.seatOfferActive) {
     return;
@@ -1163,7 +1171,7 @@ function updateStationSeatOffer(elapsed, stationSegment) {
   }
 
   if (stationSegment.mode !== "dwell") {
-    failStationSeatOffer();
+    resolveStationSeatOffer();
     return;
   }
 
@@ -1175,7 +1183,7 @@ function updateStationSeatOffer(elapsed, stationSegment) {
   );
 
   if (state.seatOfferRemaining <= 0) {
-    failStationSeatOffer();
+    resolveStationSeatOffer();
   }
 }
 
@@ -3230,14 +3238,6 @@ function rush() {
   window.setTimeout(() => queueEl.classList.remove("rushing"), 120);
   triggerRushShake();
   vibrate(VIBRATION_CONFIG.rushTap);
-
-  if (
-    state.phase === "riding" &&
-    state.seatOfferActive &&
-    state.seatProgress >= SEAT_RUSH_CONFIG.seatThreshold
-  ) {
-    secureStationSeatOffer();
-  }
 
   render();
 }
