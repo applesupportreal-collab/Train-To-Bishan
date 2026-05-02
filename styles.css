@@ -96,8 +96,8 @@ button {
   gap: 24px;
   padding: max(26px, env(safe-area-inset-top)) 20px max(22px, env(safe-area-inset-bottom));
   background:
-    linear-gradient(180deg, rgba(23, 32, 38, 0.12), rgba(23, 32, 38, 0.34)),
-    url("assets/main-background-placeholder.svg");
+    linear-gradient(180deg, rgba(23, 32, 38, 0.12), rgba(23, 32, 38, 0.36)),
+    url("assets/city_hall_platform.jpg");
   background-position: center;
   background-size: cover;
   overflow: hidden;
@@ -141,7 +141,7 @@ button {
   overflow: hidden;
   background:
     linear-gradient(180deg, rgba(255, 250, 240, 0.82), rgba(255, 250, 240, 0.96)),
-    url("assets/train-interior-placeholder.svg");
+    url("assets/seats_interior.jpg");
   background-position: center;
   background-size: cover;
   text-align: center;
@@ -322,16 +322,17 @@ button {
   min-height: 0;
   overflow: hidden;
   background:
-    linear-gradient(180deg, #e3eef1 0 28%, #f3ead7 28% 32%, #b6b9b4 32% 66%, #837a6b 66% 67%, #cfc6b5 67%);
+    linear-gradient(180deg, rgba(23, 32, 38, 0.04), rgba(23, 32, 38, 0.2)),
+    url("assets/city_hall_platform.jpg");
+  background-position: center;
+  background-size: cover;
 }
 
 .scene::before {
   position: absolute;
   inset: 0;
   z-index: -1;
-  background:
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.38) 0 2px, transparent 2px 54px),
-    linear-gradient(180deg, transparent 0 66%, rgba(0, 0, 0, 0.08) 66% 100%);
+  background: linear-gradient(180deg, rgba(255, 250, 240, 0.04), rgba(23, 32, 38, 0.18));
   content: "";
 }
 
@@ -385,6 +386,7 @@ button {
   position: absolute;
   right: 50%;
   bottom: 31%;
+  display: none;
   width: min(620px, 148vw);
   height: 142px;
   transform: translateX(-125%);
@@ -500,6 +502,7 @@ button {
   left: 0;
   right: 0;
   bottom: 27%;
+  display: none;
   height: 16px;
   background: repeating-linear-gradient(90deg, var(--yellow) 0 48px, transparent 48px 72px);
   box-shadow: 0 10px 0 rgba(32, 35, 37, 0.16);
@@ -510,7 +513,7 @@ button {
   left: 8%;
   right: 8%;
   bottom: 16%;
-  display: flex;
+  display: none;
   justify-content: center;
   align-items: end;
   gap: clamp(8px, 3vw, 18px);
@@ -596,7 +599,7 @@ button {
   z-index: 4;
   background:
     linear-gradient(180deg, rgba(23, 32, 38, 0.08), rgba(23, 32, 38, 0.18)),
-    url("assets/train-interior-placeholder.svg");
+    url("assets/seats_interior.jpg");
   background-position: center;
   background-size: cover;
 }
