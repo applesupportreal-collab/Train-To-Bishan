@@ -267,6 +267,8 @@ const stationSignCodeEl = document.querySelector(".station-sign .line-code");
 const stationSignNameEl = document.querySelector(".station-sign span:last-child");
 const successHeadingEl = document.querySelector(".success-copy h2");
 const successStationCodeEl = document.querySelector(".success-copy .line-code");
+const MAIN_SUBTITLE_HTML =
+  "Experience the daily commute of the average Singaporean from the <s>comfort</s> discomfort of your home!";
 const STATUS_TEXT_DURATION = 5_000;
 const STATUS_TEXT_FADE_DURATION = 420;
 let statusTextHideTimer = null;
@@ -1618,11 +1620,10 @@ function renderDeviceIndicator() {
 }
 
 function renderRouteCopy() {
-  const origin = getOriginStation();
   const destination = getDestinationStation();
 
   routeTitleEl.textContent = `Train to ${destination.name}`;
-  routeSubtitleEl.textContent = `${origin.name} to ${destination.name} station`;
+  routeSubtitleEl.innerHTML = MAIN_SUBTITLE_HTML;
   successHeadingEl.textContent = `You Survived Train to ${destination.name}!`;
   successStationCodeEl.textContent = destination.code;
 }
