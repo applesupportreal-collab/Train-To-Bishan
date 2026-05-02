@@ -44,6 +44,12 @@ const TRAIN_SOUND_CONFIG = {
   defaultVolume: 1,
   maxConcurrent: 1,
 };
+const ANNOUNCEMENT_CONFIG = {
+  basePath: "sounds",
+  prefix: "next_station",
+  extension: "ogg",
+  volume: 1,
+};
 const ACTION_ACTIVATION_VIBRATION = [35, 25, 35];
 
 const gameEl = document.querySelector(".game");
@@ -185,6 +191,111 @@ function getTrainSoundEffects() {
     .filter(Boolean);
 }
 
+function getStationAudioSlug(stationName) {
+  return stationName
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function getNextStationAnnouncementSrc(station) {
+  const slug = getStationAudioSlug(station.name);
+  return `${ANNOUNCEMENT_CONFIG.basePath}/${ANNOUNCEMENT_CONFIG.prefix}_${slug}.${ANNOUNCEMENT_CONFIG.extension}`;
+}
+
+function createStationAnnouncementPlayer() {
+  let pendingStation = null;
+  let activeAudio = null;
+
+  function clearActiveAudio() {
+    if (!activeAudio) {
+      return;
+    }
+
+    activeAudio.pause();
+    activeAudio.removeAttribute("src");
+    activeAudio.load();
+    activeAudio = null;
+  }
+
+  function createAudio(station, muted = false) {
+    const audio = new Audio(getNextStationAnnouncementSrc(station));
+    audio.volume = muted ? 0 : clampVolume(ANNOUNCEMENT_CONFIG.volume);
+    audio.muted = muted;
+    audio.preload = "auto";
+    audio.playsInline = true;
+    return audio;
+  }
+
+  return {
+    blocked: false,
+    unlock() {
+      const primer = createAudio(ROUTE_STATIONS[1], true);
+      const playAttempt = primer.play();
+
+      if (playAttempt) {
+        playAttempt
+          .then(() => {
+            primer.pause();
+            primer.currentTime = 0;
+          })
+          .catch(() => {});
+      }
+    },
+    stop() {
+      pendingStation = null;
+      this.blocked = false;
+      clearActiveAudio();
+    },
+    playNextStation(station) {
+      pendingStation = station;
+      this.blocked = false;
+      clearActiveAudio();
+
+      const audio = createAudio(station);
+      activeAudio = audio;
+
+      audio.addEventListener("ended", () => {
+        if (activeAudio === audio) {
+          activeAudio = null;
+        }
+      });
+
+      audio.addEventListener("error", () => {
+        if (activeAudio === audio) {
+          activeAudio = null;
+        }
+      });
+
+      const playAttempt = audio.play();
+
+      if (playAttempt) {
+        playAttempt
+          .then(() => {
+            pendingStation = null;
+          })
+          .catch(() => {
+            this.blocked = true;
+            clearActiveAudio();
+            render();
+          });
+      }
+    },
+    enableFromGesture() {
+      this.blocked = false;
+
+      if (pendingStation) {
+        this.playNextStation(pendingStation);
+      } else {
+        this.unlock();
+      }
+
+      render();
+    },
+  };
+}
+
 function createTrainSoundscape() {
   let effects = getTrainSoundEffects();
   const activeAudio = new Set();
@@ -304,6 +415,7 @@ function createTrainSoundscape() {
 }
 
 const trainSoundscape = createTrainSoundscape();
+const stationAnnouncementPlayer = createStationAnnouncementPlayer();
 const startScreenEl = document.querySelector("#startScreen");
 const playScreenEl = document.querySelector("#playScreen");
 
@@ -417,6 +529,7 @@ function handleOrientation(event) {
 
 function resetState() {
   trainSoundscape.stop();
+  stationAnnouncementPlayer.stop();
   state.phase = "idle";
   state.lastTick = 0;
   state.arrivalRemaining = DURATIONS.arrival;
@@ -431,6 +544,7 @@ function resetState() {
 
 function startWaiting() {
   trainSoundscape.stop();
+  stationAnnouncementPlayer.stop();
   state.phase = "waiting";
   state.lastTick = performance.now();
   state.arrivalRemaining = DURATIONS.arrival;
@@ -455,6 +569,7 @@ function startRide(seated) {
   state.phase = "riding";
   state.seated = seated;
   state.rideRemaining = DURATIONS.ride;
+  stationAnnouncementPlayer.playNextStation(ROUTE_STATIONS[1]);
   trainSoundscape.start();
   vibrate(seated ? 90 : [40, 35, 40]);
   render();
@@ -647,7 +762,11 @@ function getActionState(now = performance.now()) {
     };
   }
 
-  if (state.phase === "riding" && trainSoundscape.blocked && trainSoundscape.hasSounds()) {
+  if (
+    state.phase === "riding" &&
+    (stationAnnouncementPlayer.blocked ||
+      (trainSoundscape.blocked && trainSoundscape.hasSounds()))
+  ) {
     return {
       enabled: true,
       label: "Enable sound",
@@ -706,6 +825,7 @@ function triggerAction() {
   if (action.type === "rush") {
     rush();
   } else if (action.type === "sound") {
+    stationAnnouncementPlayer.enableFromGesture();
     trainSoundscape.enableFromGesture();
   } else if (action.type === "reset") {
     resetState();
@@ -734,6 +854,7 @@ function renderActions() {
 }
 
 startButtonEl.addEventListener("click", async () => {
+  stationAnnouncementPlayer.unlock();
   trainSoundscape.unlock();
   await requestMotionAccess();
   startWaiting();

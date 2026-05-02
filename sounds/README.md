@@ -13,3 +13,15 @@ window.TRAIN_SOUND_EFFECTS = [
 ```
 
 The game will choose from this list at random only after the player is inside the train.
+
+Next-station announcements use this filename format:
+
+```text
+next_station_<station_name>.ogg
+```
+
+Station names are lowercase with spaces replaced by underscores. For example:
+
+```text
+next_station_dhoby_ghaut.ogg
+```
