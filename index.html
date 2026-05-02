@@ -129,7 +129,25 @@
           </fieldset>
 
           <fieldset>
-            <legend>Upright</legend>
+            <legend>Upright Detection</legend>
+            <div class="upright-visual" aria-label="Beta measures forward and backward tilt. Gamma measures side tilt.">
+              <div class="upright-card">
+                <div class="upright-demo beta-demo" aria-hidden="true">
+                  <span class="phone-shape"></span>
+                  <span class="tilt-arc"></span>
+                </div>
+                <strong>Beta</strong>
+                <small>Forward/back tilt</small>
+              </div>
+              <div class="upright-card">
+                <div class="upright-demo gamma-demo" aria-hidden="true">
+                  <span class="phone-shape"></span>
+                  <span class="tilt-arc"></span>
+                </div>
+                <strong>Gamma</strong>
+                <small>Left/right tilt</small>
+              </div>
+            </div>
             <label>
               <span>Beta minimum</span>
               <input data-setting="upright.betaMin" type="number" min="0" max="180" step="1" required />
@@ -151,7 +169,7 @@
               <small>ms</small>
             </label>
             <label>
-              <span>Motion stale after</span>
+              <span>Sensor stale after</span>
               <input data-setting="upright.staleAfter" type="number" min="0" step="100" required />
               <small>ms</small>
             </label>
@@ -197,6 +215,44 @@
           </fieldset>
 
           <fieldset>
+            <legend>Breakdown</legend>
+            <label>
+              <span>Breakdown chance</span>
+              <input data-setting="trainBreakdown.chance" type="number" min="0" max="100" step="1" required />
+              <small>%</small>
+            </label>
+            <label>
+              <span>Breakdown min steps</span>
+              <input data-setting="trainBreakdown.minSteps" type="number" min="1" step="1" required />
+              <small>steps</small>
+            </label>
+            <label>
+              <span>Breakdown max steps</span>
+              <input data-setting="trainBreakdown.maxSteps" type="number" min="1" step="1" required />
+              <small>steps</small>
+            </label>
+            <label>
+              <span>Breakdown tap steps</span>
+              <input data-setting="trainBreakdown.manualStepsPerPress" type="number" min="1" step="1" required />
+              <small>steps</small>
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Train Delay</legend>
+            <label>
+              <span>Delay chance</span>
+              <input data-setting="trainDelay.chance" type="number" min="0" max="100" step="1" required />
+              <small>%</small>
+            </label>
+            <label>
+              <span>Extra stop time</span>
+              <input data-setting="trainDelay.extensionDuration" type="number" min="0" step="0.5" required />
+              <small>s</small>
+            </label>
+          </fieldset>
+
+          <fieldset>
             <legend>Audio</legend>
             <label>
               <span>Fade duration</span>
@@ -224,37 +280,7 @@
               <small>s</small>
             </label>
             <label>
-              <span>Breakdown chance</span>
-              <input data-setting="trainBreakdown.chance" type="number" min="0" max="100" step="1" required />
-              <small>%</small>
-            </label>
-            <label>
-              <span>Breakdown min steps</span>
-              <input data-setting="trainBreakdown.minSteps" type="number" min="1" step="1" required />
-              <small>steps</small>
-            </label>
-            <label>
-              <span>Breakdown max steps</span>
-              <input data-setting="trainBreakdown.maxSteps" type="number" min="1" step="1" required />
-              <small>steps</small>
-            </label>
-            <label>
-              <span>Breakdown tap steps</span>
-              <input data-setting="trainBreakdown.manualStepsPerPress" type="number" min="1" step="1" required />
-              <small>steps</small>
-            </label>
-            <label>
-              <span>Train delay chance</span>
-              <input data-setting="trainDelay.chance" type="number" min="0" max="100" step="1" required />
-              <small>%</small>
-            </label>
-            <label>
-              <span>Train delay extra time</span>
-              <input data-setting="trainDelay.extensionDuration" type="number" min="0" step="0.5" required />
-              <small>s</small>
-            </label>
-            <label>
-              <span>Sound volume</span>
+              <span>Random cabin noise volume</span>
               <input data-setting="trainSound.defaultVolume" type="number" min="0" max="100" step="1" required />
               <small>%</small>
             </label>
@@ -269,27 +295,27 @@
               <small>%</small>
             </label>
             <label>
-              <span>Start volume</span>
+              <span>Intro announcement volume</span>
               <input data-setting="startSound.volume" type="number" min="0" max="100" step="1" required />
               <small>%</small>
             </label>
             <label>
-              <span>End volume</span>
+              <span>Victory sound volume</span>
               <input data-setting="endSound.volume" type="number" min="0" max="100" step="1" required />
               <small>%</small>
             </label>
             <label>
-              <span>Auntie volume</span>
+              <span>Auntie voice volume</span>
               <input data-setting="auntieSound.volume" type="number" min="0" max="100" step="1" required />
               <small>%</small>
             </label>
             <label>
-              <span>Breakdown volume</span>
+              <span>Breakdown announcement volume</span>
               <input data-setting="trainBreakdown.volume" type="number" min="0" max="100" step="1" required />
               <small>%</small>
             </label>
             <label>
-              <span>Train delay volume</span>
+              <span>Train delay announcement volume</span>
               <input data-setting="trainDelay.volume" type="number" min="0" max="100" step="1" required />
               <small>%</small>
             </label>
