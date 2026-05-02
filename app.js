@@ -2848,7 +2848,12 @@ function phaseNeedsUpright() {
     return false;
   }
 
-  return state.phase === "riding" && !state.seated && !state.breakdownActive;
+  return (
+    state.phase === "riding" &&
+    !state.seated &&
+    !state.breakdownActive &&
+    !state.seatOfferActive
+  );
 }
 
 function countdownCanMove(now) {
