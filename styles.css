@@ -21,6 +21,7 @@
 
 html,
 body {
+  height: 100%;
   min-height: 100%;
 }
 
@@ -40,7 +41,10 @@ button {
 
 .app-frame {
   position: relative;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100svh;
+  min-height: 0;
+  overflow: hidden;
   background:
     linear-gradient(180deg, rgba(29, 37, 44, 0.15), rgba(29, 37, 44, 0.42)),
     var(--paper);
@@ -85,7 +89,8 @@ button {
 
 .start-screen {
   display: grid;
-  min-height: 100dvh;
+  height: 100%;
+  min-height: 0;
   align-content: center;
   justify-items: center;
   gap: 24px;
@@ -127,7 +132,8 @@ button {
 .success-screen {
   position: relative;
   display: grid;
-  min-height: 100dvh;
+  height: 100%;
+  min-height: 0;
   align-content: center;
   justify-items: center;
   gap: 28px;
@@ -303,14 +309,17 @@ button {
 
 .game {
   display: grid;
-  grid-template-rows: minmax(360px, 58vh) 1fr;
-  min-height: 100dvh;
+  grid-template-rows: minmax(0, 1fr) auto;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
   background: var(--paper);
 }
 
 .scene {
   position: relative;
   isolation: isolate;
+  min-height: 0;
   overflow: hidden;
   background:
     linear-gradient(180deg, #e3eef1 0 28%, #f3ead7 28% 32%, #b6b9b4 32% 66%, #837a6b 66% 67%, #cfc6b5 67%);
@@ -600,6 +609,7 @@ button {
   display: grid;
   align-content: start;
   gap: 14px;
+  min-height: 0;
   padding: 18px 18px max(18px, env(safe-area-inset-bottom));
   background: var(--panel);
   box-shadow: 0 -16px 30px rgba(0, 0, 0, 0.16);
@@ -825,7 +835,8 @@ button {
 
   .app-frame {
     width: min(430px, 100%);
-    min-height: min(880px, calc(100vh - 56px));
+    height: min(880px, calc(100vh - 56px));
+    min-height: 0;
     overflow: hidden;
     border: 8px solid #10171c;
     border-radius: 28px;
@@ -835,13 +846,14 @@ button {
   .game,
   .start-screen,
   .success-screen {
-    min-height: min(880px, calc(100vh - 56px));
+    height: 100%;
+    min-height: 0;
   }
 }
 
 @media (max-height: 690px) {
   .game {
-    grid-template-rows: minmax(300px, 50vh) 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
   }
 
   .hud {

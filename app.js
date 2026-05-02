@@ -177,8 +177,6 @@ const trainInteriorEl = document.querySelector("#trainInterior");
 const statusRibbonEl = document.querySelector("#statusRibbon");
 const metersEl = document.querySelector("#meters");
 const primaryMeterEl = document.querySelector("#primaryMeter");
-const primaryLabelEl = document.querySelector("#primaryLabel");
-const primaryTimerEl = document.querySelector("#primaryTimer");
 const deviceIndicatorEl = document.querySelector("#deviceIndicator");
 const currentStationNameEl = document.querySelector("#currentStationName");
 const nextStationNameEl = document.querySelector("#nextStationName");
@@ -939,22 +937,16 @@ function renderPhaseCopy(paused, upright) {
 }
 
 function renderTimers() {
-  const showPrimaryTimer = state.phase === "boarding";
-  metersEl.hidden = !showPrimaryTimer;
-  primaryMeterEl.hidden = !showPrimaryTimer;
+  metersEl.hidden = true;
+  primaryMeterEl.hidden = true;
   metersEl.classList.add("single");
-
-  if (state.phase === "boarding") {
-    primaryLabelEl.textContent = "Boarding";
-    primaryTimerEl.textContent = formatTime(state.boardingRemaining);
-  }
 }
 
 function getActionState(now = performance.now()) {
   if (state.phase === "boarding") {
     return {
       enabled: countdownCanMove(now),
-      label: "Snatch seat",
+      label: `Snatch seat ${formatTime(state.boardingRemaining)}`,
       type: "rush",
     };
   }
