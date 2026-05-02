@@ -1,22 +1,62 @@
-const ROUTE_STATIONS = [
-  { code: "NS25", name: "City Hall" },
-  { code: "NS24", name: "Dhoby Ghaut" },
-  { code: "NS23", name: "Somerset" },
-  { code: "NS22", name: "Orchard" },
-  { code: "NS21", name: "Newton" },
-  { code: "NS20", name: "Novena" },
-  { code: "NS19", name: "Toa Payoh" },
-  { code: "NS18", name: "Braddell" },
-  { code: "NS17", name: "Bishan" },
-];
-const GAME_CONFIG = {
-  trainArrivalDuration: 15_000,
-  boardingDuration: 8_000,
-  durationBetweenStations: 12_000,
-  stationDwellDuration: 20_000,
-  // Optional per-leg overrides, from City Hall -> Dhoby Ghaut through Braddell -> Bishan.
-  stationDurations: [],
+const CONFIG_PATH = "config/game-config.json";
+const DEFAULT_GAME_SETTINGS = {
+  routeStations: [
+    { code: "NS25", name: "City Hall" },
+    { code: "NS24", name: "Dhoby Ghaut" },
+    { code: "NS23", name: "Somerset" },
+    { code: "NS22", name: "Orchard" },
+    { code: "NS21", name: "Newton" },
+    { code: "NS20", name: "Novena" },
+    { code: "NS19", name: "Toa Payoh" },
+    { code: "NS18", name: "Braddell" },
+    { code: "NS17", name: "Bishan" },
+  ],
+  timing: {
+    trainArrivalDuration: 15_000,
+    boardingDuration: 8_000,
+    durationBetweenStations: 12_000,
+    stationDwellDuration: 20_000,
+    stationDurations: [],
+  },
+  seatRush: {
+    gainPerPress: 0.08,
+    decayPerSecond: 0.16,
+    seatThreshold: 0.95,
+  },
+  upright: {
+    betaMin: 52,
+    betaMax: 128,
+    gammaMax: 38,
+    staleAfter: 1600,
+  },
+  trainSound: {
+    minDelay: 3_500,
+    maxDelay: 13_000,
+    firstMinDelay: 900,
+    firstMaxDelay: 2_400,
+    retryMinDelay: 1_500,
+    retryMaxDelay: 3_000,
+    defaultVolume: 1,
+    maxConcurrent: 1,
+  },
+  announcement: {
+    basePath: "sounds",
+    prefix: "next_station",
+    extension: "ogg",
+    volume: 1,
+  },
+  vibration: {
+    actionActivation: [35, 25, 35],
+    boardingStart: [70, 40, 70],
+    seated: 90,
+    standing: [40, 35, 40],
+    arrival: [120, 50, 120],
+    rushTap: 8,
+  },
 };
+
+let ROUTE_STATIONS = cloneStations(DEFAULT_GAME_SETTINGS.routeStations);
+let GAME_CONFIG = cloneTimingConfig(DEFAULT_GAME_SETTINGS.timing);
 const DURATIONS = {
   get arrival() {
     return GAME_CONFIG.trainArrivalDuration;
@@ -28,30 +68,107 @@ const DURATIONS = {
     return getRideDuration();
   },
 };
-const SEAT_RUSH_CONFIG = {
-  gainPerPress: 0.08,
-  decayPerSecond: 0.16,
-  seatThreshold: 0.95,
-};
-const UPRIGHT = {
-  betaMin: 52,
-  betaMax: 128,
-  gammaMax: 38,
-  staleAfter: 1600,
-};
-const TRAIN_SOUND_CONFIG = {
-  minDelay: 3_500,
-  maxDelay: 13_000,
-  defaultVolume: 1,
-  maxConcurrent: 1,
-};
-const ANNOUNCEMENT_CONFIG = {
-  basePath: "sounds",
-  prefix: "next_station",
-  extension: "ogg",
-  volume: 1,
-};
-const ACTION_ACTIVATION_VIBRATION = [35, 25, 35];
+let SEAT_RUSH_CONFIG = { ...DEFAULT_GAME_SETTINGS.seatRush };
+let UPRIGHT = { ...DEFAULT_GAME_SETTINGS.upright };
+let TRAIN_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.trainSound };
+let ANNOUNCEMENT_CONFIG = { ...DEFAULT_GAME_SETTINGS.announcement };
+let VIBRATION_CONFIG = cloneVibrationConfig(DEFAULT_GAME_SETTINGS.vibration);
+
+function cloneStations(stations) {
+  return stations.map((station) => ({ code: station.code, name: station.name }));
+}
+
+function cloneTimingConfig(config) {
+  return {
+    ...config,
+    stationDurations: Array.isArray(config.stationDurations)
+      ? [...config.stationDurations]
+      : [],
+  };
+}
+
+function cloneVibrationPattern(pattern) {
+  return Array.isArray(pattern) ? [...pattern] : pattern;
+}
+
+function cloneVibrationConfig(config) {
+  return {
+    ...config,
+    actionActivation: cloneVibrationPattern(config.actionActivation),
+    boardingStart: cloneVibrationPattern(config.boardingStart),
+    seated: cloneVibrationPattern(config.seated),
+    standing: cloneVibrationPattern(config.standing),
+    arrival: cloneVibrationPattern(config.arrival),
+    rushTap: cloneVibrationPattern(config.rushTap),
+  };
+}
+
+function readObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function normalizeStations(stations) {
+  if (!Array.isArray(stations)) {
+    return cloneStations(DEFAULT_GAME_SETTINGS.routeStations);
+  }
+
+  const normalizedStations = stations
+    .map((station) => ({
+      code: typeof station?.code === "string" ? station.code.trim() : "",
+      name: typeof station?.name === "string" ? station.name.trim() : "",
+    }))
+    .filter((station) => station.code && station.name);
+
+  return normalizedStations.length >= 2
+    ? normalizedStations
+    : cloneStations(DEFAULT_GAME_SETTINGS.routeStations);
+}
+
+function applyGameSettings(settings) {
+  const externalSettings = readObject(settings);
+
+  ROUTE_STATIONS = normalizeStations(
+    externalSettings.routeStations ?? DEFAULT_GAME_SETTINGS.routeStations,
+  );
+  GAME_CONFIG = cloneTimingConfig({
+    ...DEFAULT_GAME_SETTINGS.timing,
+    ...readObject(externalSettings.timing),
+  });
+  SEAT_RUSH_CONFIG = {
+    ...DEFAULT_GAME_SETTINGS.seatRush,
+    ...readObject(externalSettings.seatRush),
+  };
+  UPRIGHT = {
+    ...DEFAULT_GAME_SETTINGS.upright,
+    ...readObject(externalSettings.upright),
+  };
+  TRAIN_SOUND_CONFIG = {
+    ...DEFAULT_GAME_SETTINGS.trainSound,
+    ...readObject(externalSettings.trainSound),
+  };
+  ANNOUNCEMENT_CONFIG = {
+    ...DEFAULT_GAME_SETTINGS.announcement,
+    ...readObject(externalSettings.announcement),
+  };
+  VIBRATION_CONFIG = cloneVibrationConfig({
+    ...DEFAULT_GAME_SETTINGS.vibration,
+    ...readObject(externalSettings.vibration),
+  });
+}
+
+async function loadGameSettings() {
+  try {
+    const response = await fetch(CONFIG_PATH, { cache: "no-store" });
+
+    if (!response.ok) {
+      return;
+    }
+
+    applyGameSettings(await response.json());
+  } catch {
+    applyGameSettings(DEFAULT_GAME_SETTINGS);
+  }
+}
 
 const gameEl = document.querySelector(".game");
 const trainEl = document.querySelector("#train");
@@ -72,6 +189,12 @@ const actionButtonEl = document.querySelector("#actionButton");
 const successMessageEl = document.querySelector("#successMessage");
 const successRestartButtonEl = document.querySelector("#successRestartButton");
 const sensorFallbackEl = document.querySelector("#sensorFallback");
+const routeTitleEl = document.querySelector(".title-lockup h1");
+const routeSubtitleEl = document.querySelector(".title-lockup p");
+const stationSignCodeEl = document.querySelector(".station-sign .line-code");
+const stationSignNameEl = document.querySelector(".station-sign span:last-child");
+const successHeadingEl = document.querySelector(".success-copy h2");
+const successStationCodeEl = document.querySelector(".success-copy .line-code");
 
 const state = {
   phase: "idle",
@@ -176,6 +299,24 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
+function getOriginStation() {
+  return ROUTE_STATIONS[0];
+}
+
+function getDestinationStation() {
+  return ROUTE_STATIONS[ROUTE_STATIONS.length - 1];
+}
+
+function getFirstNextStation() {
+  return ROUTE_STATIONS[1] ?? getDestinationStation();
+}
+
+function resetCountdowns() {
+  state.arrivalRemaining = DURATIONS.arrival;
+  state.boardingRemaining = DURATIONS.boarding;
+  state.rideRemaining = DURATIONS.ride;
+}
+
 function clampVolume(volume) {
   const numericVolume = Number(volume);
 
@@ -252,7 +393,7 @@ function createStationAnnouncementPlayer() {
   return {
     blocked: false,
     unlock() {
-      const primer = createAudio(ROUTE_STATIONS[1], true);
+      const primer = createAudio(getFirstNextStation(), true);
       const playAttempt = primer.play();
 
       if (playAttempt) {
@@ -366,7 +507,11 @@ function createTrainSoundscape() {
     start(now = performance.now()) {
       refresh();
       this.blocked = false;
-      this.scheduleNext(now, 900, 2_400);
+      this.scheduleNext(
+        now,
+        TRAIN_SOUND_CONFIG.firstMinDelay,
+        TRAIN_SOUND_CONFIG.firstMaxDelay,
+      );
     },
     stop() {
       this.nextAt = Number.POSITIVE_INFINITY;
@@ -396,7 +541,11 @@ function createTrainSoundscape() {
       }
 
       if (activeAudio.size >= TRAIN_SOUND_CONFIG.maxConcurrent) {
-        this.scheduleNext(performance.now(), 1_500, 3_000);
+        this.scheduleNext(
+          performance.now(),
+          TRAIN_SOUND_CONFIG.retryMinDelay,
+          TRAIN_SOUND_CONFIG.retryMaxDelay,
+        );
         return;
       }
 
@@ -554,9 +703,7 @@ function resetState() {
   stationAnnouncementPlayer.stop();
   state.phase = "idle";
   state.lastTick = 0;
-  state.arrivalRemaining = DURATIONS.arrival;
-  state.boardingRemaining = DURATIONS.boarding;
-  state.rideRemaining = DURATIONS.ride;
+  resetCountdowns();
   state.seatProgress = 0;
   state.seated = false;
   state.lastActionKey = "none:false";
@@ -569,9 +716,7 @@ function startWaiting() {
   stationAnnouncementPlayer.stop();
   state.phase = "waiting";
   state.lastTick = performance.now();
-  state.arrivalRemaining = DURATIONS.arrival;
-  state.boardingRemaining = DURATIONS.boarding;
-  state.rideRemaining = DURATIONS.ride;
+  resetCountdowns();
   state.seatProgress = 0;
   state.seated = false;
   state.lastActionKey = "none:false";
@@ -583,7 +728,7 @@ function startBoarding() {
   state.phase = "boarding";
   state.boardingRemaining = DURATIONS.boarding;
   state.seatProgress = 0;
-  vibrate([70, 40, 70]);
+  vibrate(VIBRATION_CONFIG.boardingStart);
   render();
 }
 
@@ -591,9 +736,9 @@ function startRide(seated) {
   state.phase = "riding";
   state.seated = seated;
   state.rideRemaining = DURATIONS.ride;
-  stationAnnouncementPlayer.playNextStation(ROUTE_STATIONS[1]);
+  stationAnnouncementPlayer.playNextStation(getFirstNextStation());
   trainSoundscape.start();
-  vibrate(seated ? 90 : [40, 35, 40]);
+  vibrate(seated ? VIBRATION_CONFIG.seated : VIBRATION_CONFIG.standing);
   render();
 }
 
@@ -601,7 +746,7 @@ function finishRide() {
   trainSoundscape.stop();
   state.phase = "arrived";
   state.rideRemaining = 0;
-  vibrate([120, 50, 120]);
+  vibrate(VIBRATION_CONFIG.arrival);
   render();
 }
 
@@ -613,7 +758,7 @@ function rush() {
   state.seatProgress = clamp(state.seatProgress + SEAT_RUSH_CONFIG.gainPerPress, 0, 1);
   queueEl.classList.add("rushing");
   window.setTimeout(() => queueEl.classList.remove("rushing"), 120);
-  vibrate(8);
+  vibrate(VIBRATION_CONFIG.rushTap);
 
   render();
 }
@@ -697,6 +842,7 @@ function render() {
   sensorFallbackEl.textContent = state.simulatedUpright ? "Simulated upright" : "Simulated tilted";
 
   renderDeviceIndicator();
+  renderRouteCopy();
   renderSuccessScreen();
   renderStationSegment();
   renderPhaseCopy(paused, upright);
@@ -711,14 +857,27 @@ function renderDeviceIndicator() {
   deviceIndicatorEl.removeAttribute("title");
 }
 
+function renderRouteCopy() {
+  const origin = getOriginStation();
+  const destination = getDestinationStation();
+
+  routeTitleEl.textContent = `Train to ${destination.name}`;
+  routeSubtitleEl.textContent = `${origin.name} to ${destination.name} station`;
+  stationSignCodeEl.textContent = origin.code;
+  stationSignNameEl.textContent = origin.name;
+  successHeadingEl.textContent = `Arrived at ${destination.name}!`;
+  successStationCodeEl.textContent = destination.code;
+}
+
 function renderSuccessScreen() {
   if (state.phase !== "arrived") {
     return;
   }
 
+  const destination = getDestinationStation();
   successMessageEl.textContent = state.seated
-    ? "You made it to Bishan station with a seat."
-    : "You made it to Bishan station standing.";
+    ? `You made it to ${destination.name} station with a seat.`
+    : `You made it to ${destination.name} station standing.`;
 }
 
 function renderStationSegment() {
@@ -730,6 +889,8 @@ function renderStationSegment() {
 
 function renderPhaseCopy(paused, upright) {
   const usesUprightCheck = shouldCheckUpright();
+  const origin = getOriginStation();
+  const destination = getDestinationStation();
 
   if (state.phase === "idle") {
     statusRibbonEl.textContent = "Platform queue forming";
@@ -744,7 +905,7 @@ function renderPhaseCopy(paused, upright) {
   }
 
   if (state.phase === "waiting") {
-    statusRibbonEl.textContent = "Train approaching City Hall";
+    statusRibbonEl.textContent = `Train approaching ${origin.name}`;
     messageEl.textContent = usesUprightCheck
       ? "Stay upright in the queue."
       : "Wait in the queue until the train arrives.";
@@ -766,15 +927,15 @@ function renderPhaseCopy(paused, upright) {
   if (state.phase === "riding") {
     statusRibbonEl.textContent = "Failed to get a seat! Standing it shall be...";
     messageEl.textContent = usesUprightCheck
-      ? "Keep the phone upright until Bishan."
-      : "Ride it out standing until Bishan.";
+      ? `Keep the phone upright until ${destination.name}.`
+      : `Ride it out standing until ${destination.name}.`;
     return;
   }
 
-  statusRibbonEl.textContent = "Arrived at Bishan station";
+  statusRibbonEl.textContent = `Arrived at ${destination.name} station`;
   messageEl.textContent = state.seated
-    ? "You made it to Bishan station with a seat."
-    : "You made it to Bishan station standing.";
+    ? `You made it to ${destination.name} station with a seat.`
+    : `You made it to ${destination.name} station standing.`;
 }
 
 function renderTimers() {
@@ -874,7 +1035,7 @@ function renderActions() {
   const actionJustActivated = action.enabled && actionKey !== state.lastActionKey;
 
   if (actionJustActivated) {
-    vibrate(ACTION_ACTIVATION_VIBRATION);
+    vibrate(VIBRATION_CONFIG.actionActivation);
   }
 
   state.lastActionKey = actionKey;
@@ -921,4 +1082,10 @@ window.addEventListener("keydown", (event) => {
   }
 });
 
-render();
+async function initializeGame() {
+  await loadGameSettings();
+  resetCountdowns();
+  render();
+}
+
+initializeGame();

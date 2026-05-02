@@ -1,0 +1,98 @@
+{
+  "routeStations": [
+    {
+      "code": "NS25",
+      "name": "City Hall"
+    },
+    {
+      "code": "NS24",
+      "name": "Dhoby Ghaut"
+    },
+    {
+      "code": "NS23",
+      "name": "Somerset"
+    },
+    {
+      "code": "NS22",
+      "name": "Orchard"
+    },
+    {
+      "code": "NS21",
+      "name": "Newton"
+    },
+    {
+      "code": "NS20",
+      "name": "Novena"
+    },
+    {
+      "code": "NS19",
+      "name": "Toa Payoh"
+    },
+    {
+      "code": "NS18",
+      "name": "Braddell"
+    },
+    {
+      "code": "NS17",
+      "name": "Bishan"
+    }
+  ],
+  "timing": {
+    "trainArrivalDuration": 15000,
+    "boardingDuration": 8000,
+    "durationBetweenStations": 12000,
+    "stationDwellDuration": 20000,
+    "stationDurations": []
+  },
+  "seatRush": {
+    "gainPerPress": 0.08,
+    "decayPerSecond": 0.16,
+    "seatThreshold": 0.95
+  },
+  "upright": {
+    "betaMin": 52,
+    "betaMax": 128,
+    "gammaMax": 38,
+    "staleAfter": 1600
+  },
+  "trainSound": {
+    "minDelay": 3500,
+    "maxDelay": 13000,
+    "firstMinDelay": 900,
+    "firstMaxDelay": 2400,
+    "retryMinDelay": 1500,
+    "retryMaxDelay": 3000,
+    "defaultVolume": 1,
+    "maxConcurrent": 1
+  },
+  "announcement": {
+    "basePath": "sounds",
+    "prefix": "next_station",
+    "extension": "ogg",
+    "volume": 1
+  },
+  "vibration": {
+    "actionActivation": [
+      35,
+      25,
+      35
+    ],
+    "boardingStart": [
+      70,
+      40,
+      70
+    ],
+    "seated": 90,
+    "standing": [
+      40,
+      35,
+      40
+    ],
+    "arrival": [
+      120,
+      50,
+      120
+    ],
+    "rushTap": 8
+  }
+}
