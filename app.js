@@ -465,7 +465,7 @@ const settingsInputEls = Object.fromEntries(
   [...document.querySelectorAll("[data-setting]")].map((input) => [input.dataset.setting, input]),
 );
 const MAIN_SUBTITLE_HTML =
-  "Experience the daily commute of the average Singaporean from the <s>comfort</s> discomfort of your home!";
+  'Experience the daily commute of the average Singaporean from the <span class="nowrap">"dis"-comfort</span> of your home!';
 const DEMO_SKIP_ENABLED = readDemoSkipEnabled();
 const STATUS_TEXT_DURATION = 5_000;
 const STATUS_TEXT_FADE_DURATION = 420;
