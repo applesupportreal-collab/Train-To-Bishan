@@ -2,6 +2,7 @@
 
 Edit `game-config.json` to tune the static game without changing JavaScript.
 
+- `timing.initialTrainArrivalDuration` is the first City Hall train-arrival countdown, in milliseconds.
 - `timing.durationBetweenStations` is the default travel time for each station-to-station leg, in milliseconds.
 - `timing.stationDurations` can override individual legs in order: City Hall to Dhoby Ghaut, Dhoby Ghaut to Somerset, and so on. Leave it empty to use the default for every leg.
 - `timing.stationDwellDuration` is how long the train stays stopped at each intermediate station.

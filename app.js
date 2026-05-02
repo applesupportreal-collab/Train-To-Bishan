@@ -12,6 +12,7 @@ const DEFAULT_GAME_SETTINGS = {
     { code: "NS17", name: "Bishan" },
   ],
   timing: {
+    initialTrainArrivalDuration: 15_000,
     trainArrivalDuration: 15_000,
     boardingDuration: 8_000,
     durationBetweenStations: 12_000,
@@ -71,7 +72,7 @@ let ROUTE_STATIONS = cloneStations(DEFAULT_GAME_SETTINGS.routeStations);
 let GAME_CONFIG = cloneTimingConfig(DEFAULT_GAME_SETTINGS.timing);
 const DURATIONS = {
   get arrival() {
-    return GAME_CONFIG.trainArrivalDuration;
+    return GAME_CONFIG.initialTrainArrivalDuration;
   },
   get boarding() {
     return GAME_CONFIG.boardingDuration;
@@ -93,11 +94,25 @@ function cloneStations(stations) {
 }
 
 function cloneTimingConfig(config) {
-  return {
+  const timingConfig = {
     ...config,
     stationDurations: Array.isArray(config.stationDurations)
       ? [...config.stationDurations]
       : [],
+  };
+  const configuredArrivalDuration = Number(
+    timingConfig.initialTrainArrivalDuration ?? timingConfig.trainArrivalDuration,
+  );
+  const fallbackArrivalDuration = DEFAULT_GAME_SETTINGS.timing.initialTrainArrivalDuration;
+  const initialTrainArrivalDuration =
+    Number.isFinite(configuredArrivalDuration) && configuredArrivalDuration >= 0
+      ? configuredArrivalDuration
+      : fallbackArrivalDuration;
+
+  return {
+    ...timingConfig,
+    initialTrainArrivalDuration,
+    trainArrivalDuration: initialTrainArrivalDuration,
   };
 }
 

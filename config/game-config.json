@@ -38,7 +38,8 @@
     }
   ],
   "timing": {
-    "trainArrivalDuration": 10000,
+    "initialTrainArrivalDuration": 15000,
+    "trainArrivalDuration": 15000,
     "boardingDuration": 8000,
     "durationBetweenStations": 20000,
     "stationDwellDuration": 20000,
