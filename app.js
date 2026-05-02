@@ -69,6 +69,8 @@ const segmentProgressEl = document.querySelector("#segmentProgress");
 const messageEl = document.querySelector("#message");
 const startButtonEl = document.querySelector("#startButton");
 const actionButtonEl = document.querySelector("#actionButton");
+const successMessageEl = document.querySelector("#successMessage");
+const successRestartButtonEl = document.querySelector("#successRestartButton");
 const sensorFallbackEl = document.querySelector("#sensorFallback");
 
 const state = {
@@ -437,6 +439,7 @@ const trainSoundscape = createTrainSoundscape();
 const stationAnnouncementPlayer = createStationAnnouncementPlayer();
 const startScreenEl = document.querySelector("#startScreen");
 const playScreenEl = document.querySelector("#playScreen");
+const successScreenEl = document.querySelector("#successScreen");
 
 function mediaMatches(query) {
   return typeof window.matchMedia === "function" && window.matchMedia(query).matches;
@@ -679,7 +682,8 @@ function render() {
         !realMotionIsFresh(now)));
 
   startScreenEl.hidden = state.phase !== "idle";
-  playScreenEl.hidden = state.phase === "idle";
+  playScreenEl.hidden = state.phase === "idle" || state.phase === "arrived";
+  successScreenEl.hidden = state.phase !== "arrived";
   gameEl.classList.toggle("paused", paused);
   document.body.classList.toggle("arrival-pulse", state.phase === "boarding");
   trainEl.classList.toggle("arrived", state.phase !== "idle" && state.arrivalRemaining <= 0);
@@ -693,6 +697,7 @@ function render() {
   sensorFallbackEl.textContent = state.simulatedUpright ? "Simulated upright" : "Simulated tilted";
 
   renderDeviceIndicator();
+  renderSuccessScreen();
   renderStationSegment();
   renderPhaseCopy(paused, upright);
   renderTimers();
@@ -704,6 +709,16 @@ function renderDeviceIndicator() {
   deviceIndicatorEl.textContent = desktopMode ? "desktop_windows" : "smartphone";
   deviceIndicatorEl.setAttribute("aria-label", desktopMode ? "Desktop device" : "Mobile device");
   deviceIndicatorEl.removeAttribute("title");
+}
+
+function renderSuccessScreen() {
+  if (state.phase !== "arrived") {
+    return;
+  }
+
+  successMessageEl.textContent = state.seated
+    ? "You made it to Bishan station with a seat."
+    : "You made it to Bishan station standing.";
 }
 
 function renderStationSegment() {
@@ -882,6 +897,8 @@ startButtonEl.addEventListener("click", async () => {
 });
 
 actionButtonEl.addEventListener("click", triggerAction);
+
+successRestartButtonEl.addEventListener("click", resetState);
 
 sensorFallbackEl.addEventListener("click", () => {
   state.usingSimulatedMotion = true;
