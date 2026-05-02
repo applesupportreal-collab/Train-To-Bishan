@@ -2111,10 +2111,6 @@ function phaseNeedsUpright() {
     return false;
   }
 
-  if (state.phase === "waiting" || state.phase === "boarding") {
-    return true;
-  }
-
   return state.phase === "riding" && !state.seated;
 }
 
@@ -2697,9 +2693,7 @@ function renderPhaseCopy(paused, upright) {
 
   if (state.phase === "waiting") {
     statusRibbonEl.textContent = `Train approaching ${origin.name}`;
-    messageEl.textContent = usesUprightCheck
-      ? "Stay upright in the queue."
-      : "Wait in the queue until the train arrives.";
+    messageEl.textContent = "Wait in the queue until the train arrives.";
     return;
   }
 
