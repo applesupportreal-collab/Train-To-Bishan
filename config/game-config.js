@@ -50,6 +50,9 @@ window.TRAIN_TO_BISHAN_GAME_CONFIG = {
     decayPerSecond: 0.16,
     seatThreshold: 0.95,
   },
+  seatOffer: {
+    chance: 0.4,
+  },
   upright: {
     betaMin: 48,
     betaMax: 132,

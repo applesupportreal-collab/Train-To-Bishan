@@ -9,6 +9,7 @@ Edit `game-config.json` to tune the static game without changing JavaScript.
 - `timing.durationBetweenStations` is the default travel time for each station-to-station leg, in milliseconds.
 - `timing.stationDurations` can override individual legs in order: City Hall to Dhoby Ghaut, Dhoby Ghaut to Somerset, and so on. Leave it empty to use the default for every leg.
 - `timing.stationDwellDuration` is how long the train stays stopped at each intermediate station.
+- `seatOffer.chance` controls the odds that a seat becomes available at each station stop while the player is standing.
 - `upright.betaMin`, `upright.betaMax`, and `upright.gammaMax` control the accepted phone angle range.
 - `upright.checkInterval` controls how often the app re-checks the phone angle, in milliseconds.
 - `audioFade.duration` controls the fade-in and fade-out time for every sound, in milliseconds.
@@ -21,6 +22,6 @@ Edit `game-config.json` to tune the static game without changing JavaScript.
 - `auntieEvent.chance` controls the odds that an auntie appears on each departure while the player has a seat.
 - `auntieEvent.minDuration` and `auntieEvent.maxDuration` set how long she stays on screen, in milliseconds.
 - `auntieEvent.scoldAfter` is how long the player can leave the screen undimmed before losing the seat.
-- `seatRush`, `upright`, `trainSound`, `announcement`, `auntieEvent`, and `vibration` control the other game mechanics.
+- `seatRush`, `seatOffer`, `upright`, `trainSound`, `announcement`, `auntieEvent`, and `vibration` control the other game mechanics.
 
 The app has the same defaults baked into `app.js` as a fallback, so it still starts if the JSON file cannot be loaded.

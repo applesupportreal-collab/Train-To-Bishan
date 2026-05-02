@@ -28,6 +28,9 @@ const DEFAULT_GAME_SETTINGS = {
     decayPerSecond: 0.16,
     seatThreshold: 0.95,
   },
+  seatOffer: {
+    chance: 0.4,
+  },
   upright: {
     betaMin: 48,
     betaMax: 132,
@@ -105,6 +108,7 @@ const DURATIONS = {
   },
 };
 let SEAT_RUSH_CONFIG = { ...DEFAULT_GAME_SETTINGS.seatRush };
+let SEAT_OFFER_CONFIG = { ...DEFAULT_GAME_SETTINGS.seatOffer };
 let UPRIGHT = { ...DEFAULT_GAME_SETTINGS.upright };
 let TRAIN_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.trainSound };
 let AUDIO_FADE_CONFIG = { ...DEFAULT_GAME_SETTINGS.audioFade };
@@ -250,6 +254,10 @@ function applyGameSettings(settings) {
   SEAT_RUSH_CONFIG = {
     ...DEFAULT_GAME_SETTINGS.seatRush,
     ...readObject(externalSettings.seatRush),
+  };
+  SEAT_OFFER_CONFIG = {
+    ...DEFAULT_GAME_SETTINGS.seatOffer,
+    ...readObject(externalSettings.seatOffer),
   };
   UPRIGHT = {
     ...DEFAULT_GAME_SETTINGS.upright,
@@ -431,6 +439,9 @@ const state = {
   boardingRemaining: DURATIONS.boarding,
   rideRemaining: DURATIONS.ride,
   seatProgress: 0,
+  seatOfferActive: false,
+  seatOfferRemaining: 0,
+  seatOfferStationsChecked: new Set(),
   seated: false,
   nextStationAnnouncementsPlayed: new Set(),
   arrivingAnnouncementsPlayed: new Set(),
@@ -554,6 +565,12 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
+function getSeatOfferChance() {
+  const configuredChance = Number(SEAT_OFFER_CONFIG.chance);
+  const fallbackChance = DEFAULT_GAME_SETTINGS.seatOffer.chance;
+  return Number.isFinite(configuredChance) ? clamp(configuredChance, 0, 1) : fallbackChance;
+}
+
 function getAuntieChance() {
   const configuredChance = Number(AUNTIE_CONFIG.chance);
   const fallbackChance = DEFAULT_GAME_SETTINGS.auntieEvent.chance;
@@ -627,6 +644,7 @@ function dismissAuntieEvent() {
 
 function forceStandForAuntie() {
   resetAuntieEvent();
+  clearStationSeatOffer();
   state.seated = false;
   state.lastActionKey = "none:false";
   vibrate(VIBRATION_CONFIG.standing);
@@ -730,6 +748,97 @@ function isSleepActionActive() {
   return action.enabled && action.type === "sleep";
 }
 
+function resetStationSeatOffer() {
+  state.seatOfferActive = false;
+  state.seatOfferRemaining = 0;
+}
+
+function clearStationSeatOffer() {
+  resetStationSeatOffer();
+  state.seatProgress = 0;
+}
+
+function startStationSeatOffer(stationSegment) {
+  if (state.seated || state.seatOfferActive) {
+    return;
+  }
+
+  hideStatusText(true);
+  state.seatOfferActive = true;
+  state.seatOfferRemaining = stationSegment.remaining;
+  state.seatProgress = 0;
+  state.lastActionKey = "none:false";
+  showStatusText(`Seat available at ${stationSegment.current.name}!`, "success");
+}
+
+function maybeStartStationSeatOffer(stationSegment) {
+  if (
+    state.phase !== "riding" ||
+    state.seated ||
+    state.seatOfferActive ||
+    stationSegment.mode !== "dwell"
+  ) {
+    return;
+  }
+
+  const key = getStationAnnouncementKey(
+    stationSegment.current,
+    "seat-offer",
+    stationSegment.legIndex,
+  );
+
+  if (state.seatOfferStationsChecked.has(key)) {
+    return;
+  }
+
+  state.seatOfferStationsChecked.add(key);
+
+  if (Math.random() < getSeatOfferChance()) {
+    startStationSeatOffer(stationSegment);
+  }
+}
+
+function secureStationSeatOffer() {
+  clearStationSeatOffer();
+  state.seated = true;
+  state.lastActionKey = "none:false";
+  vibrate(VIBRATION_CONFIG.seated);
+  showStatusText("Seat secured!", "success");
+}
+
+function failStationSeatOffer() {
+  clearStationSeatOffer();
+  state.lastActionKey = "none:false";
+  showStatusText("Failed to get a seat! Standing it shall be...", "danger");
+}
+
+function updateStationSeatOffer(elapsed, stationSegment) {
+  if (!state.seatOfferActive) {
+    return;
+  }
+
+  if (state.seated) {
+    clearStationSeatOffer();
+    return;
+  }
+
+  if (stationSegment.mode !== "dwell") {
+    failStationSeatOffer();
+    return;
+  }
+
+  state.seatOfferRemaining = stationSegment.remaining;
+  state.seatProgress = clamp(
+    state.seatProgress - SEAT_RUSH_CONFIG.decayPerSecond * (elapsed / 1000),
+    0,
+    1,
+  );
+
+  if (state.seatOfferRemaining <= 0) {
+    failStationSeatOffer();
+  }
+}
+
 function getOriginStation() {
   return ROUTE_STATIONS[0];
 }
@@ -831,6 +940,7 @@ function populateSettingsForm() {
     ratioToPercent(SEAT_RUSH_CONFIG.decayPerSecond),
   );
   setSettingInputValue("seatRush.seatThreshold", ratioToPercent(SEAT_RUSH_CONFIG.seatThreshold));
+  setSettingInputValue("seatOffer.chance", ratioToPercent(getSeatOfferChance()));
   setSettingInputValue("upright.betaMin", UPRIGHT.betaMin);
   setSettingInputValue("upright.betaMax", UPRIGHT.betaMax);
   setSettingInputValue("upright.gammaMax", UPRIGHT.gammaMax);
@@ -923,6 +1033,11 @@ function readSettingsForm() {
       ),
       seatThreshold: percentToRatio(
         readSettingNumber("seatRush.seatThreshold", ratioToPercent(SEAT_RUSH_CONFIG.seatThreshold)),
+      ),
+    },
+    seatOffer: {
+      chance: percentToRatio(
+        readSettingNumber("seatOffer.chance", ratioToPercent(getSeatOfferChance())),
       ),
     },
     upright: {
@@ -2089,12 +2204,14 @@ function skipRidingToNextStation() {
   state.lastTick = performance.now();
   state.lastActionKey = "none:false";
   resetAuntieEvent();
+  clearStationSeatOffer();
 
   if (state.rideRemaining <= 0) {
     finishRide();
     return;
   }
 
+  maybeStartStationSeatOffer(getStationSegment());
   trainSoundscape.start(performance.now());
   render();
 }
@@ -2185,10 +2302,12 @@ function resetState() {
   state.lastTick = 0;
   resetCountdowns();
   state.seatProgress = 0;
+  clearStationSeatOffer();
   state.seated = false;
   state.nextStationAnnouncementsPlayed = new Set();
   state.arrivingAnnouncementsPlayed = new Set();
   state.doorClosingAnnouncementsPlayed = new Set();
+  state.seatOfferStationsChecked = new Set();
   state.auntieDeparturesChecked = new Set();
   resetAuntieEvent();
   state.lastActionKey = "none:false";
@@ -2209,10 +2328,12 @@ function startWaiting() {
   state.lastTick = performance.now();
   resetCountdowns();
   state.seatProgress = 0;
+  clearStationSeatOffer();
   state.seated = false;
   state.nextStationAnnouncementsPlayed = new Set();
   state.arrivingAnnouncementsPlayed = new Set();
   state.doorClosingAnnouncementsPlayed = new Set();
+  state.seatOfferStationsChecked = new Set();
   state.auntieDeparturesChecked = new Set();
   resetAuntieEvent();
   state.lastActionKey = "none:false";
@@ -2226,6 +2347,7 @@ function startBoarding() {
   state.phase = "boarding";
   state.boardingRemaining = DURATIONS.boarding;
   state.seatProgress = 0;
+  clearStationSeatOffer();
   vibrate(VIBRATION_CONFIG.boardingStart);
   render();
 }
@@ -2237,6 +2359,8 @@ function startRide(seated) {
   state.nextStationAnnouncementsPlayed = new Set();
   state.arrivingAnnouncementsPlayed = new Set();
   state.doorClosingAnnouncementsPlayed = new Set();
+  state.seatOfferStationsChecked = new Set();
+  clearStationSeatOffer();
   state.auntieDeparturesChecked = new Set();
   resetAuntieEvent();
   playDueNextStationAnnouncement();
@@ -2252,6 +2376,7 @@ function startRide(seated) {
 function finishRide() {
   hideStatusText(true);
   resetAuntieEvent();
+  clearStationSeatOffer();
   trainSoundscape.stop();
   state.phase = "arrived";
   state.rideRemaining = 0;
@@ -2261,7 +2386,9 @@ function finishRide() {
 }
 
 function rush() {
-  if (state.phase !== "boarding" || !countdownCanMove(performance.now())) {
+  const action = getActionState(performance.now());
+
+  if (action.type !== "rush" || !action.enabled) {
     return;
   }
 
@@ -2269,6 +2396,14 @@ function rush() {
   queueEl.classList.add("rushing");
   window.setTimeout(() => queueEl.classList.remove("rushing"), 120);
   vibrate(VIBRATION_CONFIG.rushTap);
+
+  if (
+    state.phase === "riding" &&
+    state.seatOfferActive &&
+    state.seatProgress >= SEAT_RUSH_CONFIG.seatThreshold
+  ) {
+    secureStationSeatOffer();
+  }
 
   render();
 }
@@ -2399,6 +2534,9 @@ function tick(now) {
       }
     } else if (state.phase === "riding") {
       state.rideRemaining -= elapsed;
+      const stationSegment = getStationSegment();
+      maybeStartStationSeatOffer(stationSegment);
+      updateStationSeatOffer(elapsed, stationSegment);
       playDueNextStationAnnouncement();
       playDueArrivingAnnouncement();
       playDueDoorClosingSound();
@@ -2571,6 +2709,14 @@ function renderPhaseCopy(paused, upright) {
     return;
   }
 
+  if (state.phase === "riding" && !state.seated && state.seatOfferActive) {
+    const stationSegment = getStationSegment();
+    statusRibbonEl.classList.add("success");
+    statusRibbonEl.textContent = `Seat available at ${stationSegment.current.name}`;
+    messageEl.textContent = "Spam the button before someone else sits down.";
+    return;
+  }
+
   if (state.phase === "riding" && state.seated && state.auntieActive) {
     statusRibbonEl.textContent = "Auntie wants your seat";
     messageEl.textContent = "Pretend to sleep.";
@@ -2608,6 +2754,14 @@ function getActionState(now = performance.now()) {
     return {
       enabled: countdownCanMove(now),
       label: `SNATCH SEAT!!! ${formatTime(state.boardingRemaining)}`,
+      type: "rush",
+    };
+  }
+
+  if (state.phase === "riding" && !state.seated && state.seatOfferActive) {
+    return {
+      enabled: countdownCanMove(now),
+      label: `SNATCH SEAT!!! ${formatTime(state.seatOfferRemaining)}`,
       type: "rush",
     };
   }
@@ -2713,7 +2867,7 @@ function renderActions() {
   actionButtonEl.style.setProperty("--seat-progress-ratio", state.seatProgress.toFixed(3));
   actionButtonEl.classList.toggle(
     "seat-ready",
-    state.phase === "boarding" && state.seatProgress >= SEAT_RUSH_CONFIG.seatThreshold,
+    action.type === "rush" && state.seatProgress >= SEAT_RUSH_CONFIG.seatThreshold,
   );
 }
 
