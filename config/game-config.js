@@ -84,6 +84,16 @@ window.TRAIN_TO_BISHAN_GAME_CONFIG = {
     volume: 1,
     arrivingLeadTime: 10000,
   },
+  auntieEvent: {
+    chance: 0.2,
+    imageSrc: "assets/auntie-placeholder.svg",
+    scoldAfter: 3000,
+    minDuration: 20000,
+    maxDuration: 30000,
+    fadeDuration: 700,
+    eyesOpenThreshold: 0.08,
+    slideDuration: 2200,
+  },
   vibration: {
     actionActivation: [35, 25, 35],
     boardingStart: [70, 40, 70],

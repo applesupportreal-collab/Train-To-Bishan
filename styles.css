@@ -431,6 +431,15 @@ button {
   display: none;
 }
 
+.sleep-dim {
+  position: absolute;
+  inset: 0;
+  z-index: 55;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .train {
   position: absolute;
   right: 50%;
@@ -657,6 +666,49 @@ button {
   display: none;
 }
 
+.auntie-event {
+  position: absolute;
+  top: 10%;
+  bottom: 0;
+  z-index: 7;
+  display: flex;
+  width: min(46%, 220px);
+  align-items: end;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 420ms ease,
+    transform var(--auntie-slide-duration, 2200ms) cubic-bezier(0.22, 0.82, 0.26, 1);
+}
+
+.auntie-event.from-left {
+  left: 0;
+  justify-content: flex-start;
+  transform: translateX(-112%);
+}
+
+.auntie-event.from-right {
+  right: 0;
+  justify-content: flex-end;
+  transform: translateX(112%);
+}
+
+.auntie-event.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.auntie-event img {
+  max-width: 100%;
+  max-height: 82%;
+  object-fit: contain;
+  filter: drop-shadow(0 16px 22px rgba(0, 0, 0, 0.28));
+}
+
+.auntie-event[hidden] {
+  display: none;
+}
+
 .hud {
   display: grid;
   align-content: start;
@@ -819,6 +871,15 @@ button {
 .action-button.seat-ready {
   border-color: #f0c344;
   box-shadow: 0 0 0 4px rgba(240, 195, 68, 0.22), 0 12px 22px rgba(22, 128, 96, 0.26);
+}
+
+.action-button[data-action="sleep"] {
+  border-color: #f7f3eb;
+  background: linear-gradient(180deg, #1f2933, #0d1116);
+  color: #fffaf0;
+  box-shadow:
+    0 0 0 4px rgba(23, 32, 38, 0.22),
+    0 14px 28px rgba(0, 0, 0, 0.34);
 }
 
 .action-button:disabled {

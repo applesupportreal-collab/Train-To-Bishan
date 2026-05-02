@@ -11,6 +11,9 @@ Edit `game-config.json` to tune the static game without changing JavaScript.
 - `startSound` is the sound that plays from the Start button tap.
 - `doorClosingSound.leadTime` controls how many milliseconds before train departure the `doors_are_closing.ogg` clip plays.
 - `announcement.arrivingLeadTime` controls how many milliseconds before each station the `arriving_<station_name>.ogg` clip plays.
-- `seatRush`, `upright`, `trainSound`, `announcement`, and `vibration` control the other game mechanics.
+- `auntieEvent.chance` controls the odds that an auntie appears on each departure while the player has a seat.
+- `auntieEvent.minDuration` and `auntieEvent.maxDuration` set how long she stays on screen, in milliseconds.
+- `auntieEvent.scoldAfter` is how long the player can leave the screen undimmed before losing the seat.
+- `seatRush`, `upright`, `trainSound`, `announcement`, `auntieEvent`, and `vibration` control the other game mechanics.
 
 The app has the same defaults baked into `app.js` as a fallback, so it still starts if the JSON file cannot be loaded.

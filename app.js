@@ -59,6 +59,16 @@ const DEFAULT_GAME_SETTINGS = {
     volume: 1,
     arrivingLeadTime: 10_000,
   },
+  auntieEvent: {
+    chance: 0.2,
+    imageSrc: "assets/auntie-placeholder.svg",
+    scoldAfter: 3_000,
+    minDuration: 20_000,
+    maxDuration: 30_000,
+    fadeDuration: 700,
+    eyesOpenThreshold: 0.08,
+    slideDuration: 2_200,
+  },
   vibration: {
     actionActivation: [35, 25, 35],
     boardingStart: [70, 40, 70],
@@ -88,6 +98,7 @@ let TRAIN_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.trainSound };
 let START_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.startSound };
 let DOOR_CLOSING_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.doorClosingSound };
 let ANNOUNCEMENT_CONFIG = { ...DEFAULT_GAME_SETTINGS.announcement };
+let AUNTIE_CONFIG = { ...DEFAULT_GAME_SETTINGS.auntieEvent };
 let VIBRATION_CONFIG = cloneVibrationConfig(DEFAULT_GAME_SETTINGS.vibration);
 
 function cloneStations(stations) {
@@ -188,6 +199,10 @@ function applyGameSettings(settings) {
     ...DEFAULT_GAME_SETTINGS.announcement,
     ...readObject(externalSettings.announcement),
   };
+  AUNTIE_CONFIG = {
+    ...DEFAULT_GAME_SETTINGS.auntieEvent,
+    ...readObject(externalSettings.auntieEvent),
+  };
   VIBRATION_CONFIG = cloneVibrationConfig({
     ...DEFAULT_GAME_SETTINGS.vibration,
     ...readObject(externalSettings.vibration),
@@ -229,6 +244,9 @@ const gameEl = document.querySelector(".game");
 const trainEl = document.querySelector("#train");
 const queueEl = document.querySelector("#queue");
 const trainInteriorEl = document.querySelector("#trainInterior");
+const auntieEventEl = document.querySelector("#auntieEvent");
+const auntieImageEl = document.querySelector("#auntieImage");
+const sleepDimEl = document.querySelector("#sleepDim");
 const statusRibbonEl = document.querySelector("#statusRibbon");
 const metersEl = document.querySelector("#meters");
 const primaryMeterEl = document.querySelector("#primaryMeter");
@@ -265,6 +283,13 @@ const state = {
   nextStationAnnouncementsPlayed: new Set(),
   arrivingAnnouncementsPlayed: new Set(),
   doorClosingAnnouncementsPlayed: new Set(),
+  auntieDeparturesChecked: new Set(),
+  auntieActive: false,
+  auntieSide: "left",
+  auntieSleeping: false,
+  auntieDimLevel: 0,
+  auntieOpenElapsed: 0,
+  auntieRemaining: 0,
   lastActionKey: "none:false",
   motionPermission: "unknown",
   usingSimulatedMotion: false,
@@ -364,6 +389,182 @@ function randomBetween(min, max) {
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function getAuntieChance() {
+  const configuredChance = Number(AUNTIE_CONFIG.chance);
+  const fallbackChance = DEFAULT_GAME_SETTINGS.auntieEvent.chance;
+  return Number.isFinite(configuredChance) ? clamp(configuredChance, 0, 1) : fallbackChance;
+}
+
+function getAuntieDuration() {
+  const fallbackMin = DEFAULT_GAME_SETTINGS.auntieEvent.minDuration;
+  const fallbackMax = DEFAULT_GAME_SETTINGS.auntieEvent.maxDuration;
+  const configuredMin = Number(AUNTIE_CONFIG.minDuration);
+  const configuredMax = Number(AUNTIE_CONFIG.maxDuration);
+  const minDuration =
+    Number.isFinite(configuredMin) && configuredMin >= 0 ? configuredMin : fallbackMin;
+  const maxDuration =
+    Number.isFinite(configuredMax) && configuredMax >= 0 ? configuredMax : fallbackMax;
+  const lowerDuration = Math.min(minDuration, maxDuration);
+  const upperDuration = Math.max(minDuration, maxDuration);
+  return randomBetween(lowerDuration, upperDuration);
+}
+
+function getAuntieScoldAfter() {
+  const configuredScoldAfter = Number(AUNTIE_CONFIG.scoldAfter);
+  const fallbackScoldAfter = DEFAULT_GAME_SETTINGS.auntieEvent.scoldAfter;
+  return Number.isFinite(configuredScoldAfter) && configuredScoldAfter > 0
+    ? configuredScoldAfter
+    : fallbackScoldAfter;
+}
+
+function getAuntieFadeDuration() {
+  const configuredFadeDuration = Number(AUNTIE_CONFIG.fadeDuration);
+  const fallbackFadeDuration = DEFAULT_GAME_SETTINGS.auntieEvent.fadeDuration;
+  return Number.isFinite(configuredFadeDuration) && configuredFadeDuration > 0
+    ? configuredFadeDuration
+    : fallbackFadeDuration;
+}
+
+function getAuntieEyesOpenThreshold() {
+  const configuredThreshold = Number(AUNTIE_CONFIG.eyesOpenThreshold);
+  const fallbackThreshold = DEFAULT_GAME_SETTINGS.auntieEvent.eyesOpenThreshold;
+  return Number.isFinite(configuredThreshold)
+    ? clamp(configuredThreshold, 0, 1)
+    : fallbackThreshold;
+}
+
+function getAuntieSlideDuration() {
+  const configuredSlideDuration = Number(AUNTIE_CONFIG.slideDuration);
+  const fallbackSlideDuration = DEFAULT_GAME_SETTINGS.auntieEvent.slideDuration;
+  return Number.isFinite(configuredSlideDuration) && configuredSlideDuration >= 0
+    ? configuredSlideDuration
+    : fallbackSlideDuration;
+}
+
+function getAuntieImageSrc() {
+  const configuredImageSrc =
+    typeof AUNTIE_CONFIG.imageSrc === "string" ? AUNTIE_CONFIG.imageSrc.trim() : "";
+  return configuredImageSrc || DEFAULT_GAME_SETTINGS.auntieEvent.imageSrc;
+}
+
+function resetAuntieEvent() {
+  state.auntieActive = false;
+  state.auntieSleeping = false;
+  state.auntieDimLevel = 0;
+  state.auntieOpenElapsed = 0;
+  state.auntieRemaining = 0;
+}
+
+function dismissAuntieEvent() {
+  resetAuntieEvent();
+  state.lastActionKey = "none:false";
+}
+
+function forceStandForAuntie() {
+  resetAuntieEvent();
+  state.seated = false;
+  state.lastActionKey = "none:false";
+  vibrate(VIBRATION_CONFIG.standing);
+  showStatusText("Auntie scolded you into giving up your seat.", "danger");
+}
+
+function startAuntieEvent() {
+  if (state.auntieActive || !state.seated) {
+    return;
+  }
+
+  hideStatusText(true);
+  state.auntieActive = true;
+  state.auntieSide = Math.random() < 0.5 ? "left" : "right";
+  state.auntieSleeping = false;
+  state.auntieDimLevel = 0;
+  state.auntieOpenElapsed = 0;
+  state.auntieRemaining = getAuntieDuration();
+  state.lastActionKey = "none:false";
+}
+
+function maybeStartAuntieEvent(stationSegment) {
+  if (state.phase !== "riding" || !state.seated || state.auntieActive) {
+    return;
+  }
+
+  const key = getStationAnnouncementKey(
+    stationSegment.next,
+    "auntie",
+    stationSegment.legIndex,
+  );
+
+  if (state.auntieDeparturesChecked.has(key)) {
+    return;
+  }
+
+  state.auntieDeparturesChecked.add(key);
+
+  if (Math.random() < getAuntieChance()) {
+    startAuntieEvent();
+  }
+}
+
+function updateAuntieEvent(elapsed) {
+  if (!state.auntieActive) {
+    return;
+  }
+
+  if (!state.seated) {
+    resetAuntieEvent();
+    return;
+  }
+
+  state.auntieRemaining -= elapsed;
+
+  if (state.auntieRemaining <= 0) {
+    dismissAuntieEvent();
+    return;
+  }
+
+  const targetDimLevel = state.auntieSleeping ? 1 : 0;
+  const fadeStep = elapsed / getAuntieFadeDuration();
+
+  if (state.auntieDimLevel < targetDimLevel) {
+    state.auntieDimLevel = Math.min(targetDimLevel, state.auntieDimLevel + fadeStep);
+  } else if (state.auntieDimLevel > targetDimLevel) {
+    state.auntieDimLevel = Math.max(targetDimLevel, state.auntieDimLevel - fadeStep);
+  }
+
+  if (state.auntieDimLevel <= getAuntieEyesOpenThreshold()) {
+    state.auntieOpenElapsed += elapsed;
+  } else {
+    state.auntieOpenElapsed = 0;
+  }
+
+  if (state.auntieOpenElapsed > getAuntieScoldAfter()) {
+    forceStandForAuntie();
+  }
+}
+
+function startPretendSleep() {
+  if (!isSleepActionActive()) {
+    return;
+  }
+
+  state.auntieSleeping = true;
+  render();
+}
+
+function stopPretendSleep() {
+  if (!state.auntieSleeping) {
+    return;
+  }
+
+  state.auntieSleeping = false;
+  render();
+}
+
+function isSleepActionActive() {
+  const action = getActionState();
+  return action.enabled && action.type === "sleep";
 }
 
 function getOriginStation() {
@@ -1152,6 +1353,8 @@ function resetState() {
   state.nextStationAnnouncementsPlayed = new Set();
   state.arrivingAnnouncementsPlayed = new Set();
   state.doorClosingAnnouncementsPlayed = new Set();
+  state.auntieDeparturesChecked = new Set();
+  resetAuntieEvent();
   state.lastActionKey = "none:false";
   state.simulatedUpright = true;
   render();
@@ -1170,6 +1373,8 @@ function startWaiting() {
   state.nextStationAnnouncementsPlayed = new Set();
   state.arrivingAnnouncementsPlayed = new Set();
   state.doorClosingAnnouncementsPlayed = new Set();
+  state.auntieDeparturesChecked = new Set();
+  resetAuntieEvent();
   state.lastActionKey = "none:false";
   requestAnimationFrame(tick);
   render();
@@ -1190,6 +1395,8 @@ function startRide(seated) {
   state.nextStationAnnouncementsPlayed = new Set();
   state.arrivingAnnouncementsPlayed = new Set();
   state.doorClosingAnnouncementsPlayed = new Set();
+  state.auntieDeparturesChecked = new Set();
+  resetAuntieEvent();
   playDueNextStationAnnouncement();
   trainSoundscape.start();
   vibrate(seated ? VIBRATION_CONFIG.seated : VIBRATION_CONFIG.standing);
@@ -1202,6 +1409,7 @@ function startRide(seated) {
 
 function finishRide() {
   hideStatusText(true);
+  resetAuntieEvent();
   trainSoundscape.stop();
   state.phase = "arrived";
   state.rideRemaining = 0;
@@ -1282,6 +1490,7 @@ function playDueNextStationAnnouncement() {
 
   state.nextStationAnnouncementsPlayed.add(key);
   stationAnnouncementPlayer.playNextStation(stationSegment.next);
+  maybeStartAuntieEvent(stationSegment);
 }
 
 function playDueDoorClosingSound() {
@@ -1350,6 +1559,7 @@ function tick(now) {
       playDueNextStationAnnouncement();
       playDueArrivingAnnouncement();
       playDueDoorClosingSound();
+      updateAuntieEvent(elapsed);
 
       if (state.rideRemaining <= 0) {
         finishRide();
@@ -1394,6 +1604,7 @@ function render() {
   renderSceneStationSign();
   renderSuccessScreen();
   renderStationSegment();
+  renderAuntieEvent();
   renderPhaseCopy(paused, upright);
   renderTimers();
   renderActions();
@@ -1448,6 +1659,38 @@ function renderStationSegment() {
   segmentProgressEl.style.width = `${Math.round(stationSegment.progress * 100)}%`;
 }
 
+function renderAuntieEvent() {
+  sleepDimEl.style.opacity = state.auntieDimLevel.toFixed(3);
+  auntieImageEl.src = getAuntieImageSrc();
+  auntieEventEl.style.setProperty(
+    "--auntie-slide-duration",
+    `${Math.round(getAuntieSlideDuration())}ms`,
+  );
+  auntieEventEl.classList.toggle("from-left", state.auntieSide !== "right");
+  auntieEventEl.classList.toggle("from-right", state.auntieSide === "right");
+
+  if (!state.auntieActive) {
+    auntieEventEl.classList.remove("visible");
+    auntieEventEl.hidden = true;
+    return;
+  }
+
+  const wasHidden = auntieEventEl.hidden;
+  auntieEventEl.hidden = false;
+
+  if (wasHidden) {
+    auntieEventEl.classList.remove("visible");
+    window.requestAnimationFrame(() => {
+      if (state.auntieActive) {
+        auntieEventEl.classList.add("visible");
+      }
+    });
+    return;
+  }
+
+  auntieEventEl.classList.add("visible");
+}
+
 function renderPhaseCopy(paused, upright) {
   const usesUprightCheck = shouldCheckUpright();
   const origin = getOriginStation();
@@ -1476,6 +1719,12 @@ function renderPhaseCopy(paused, upright) {
   if (state.phase === "boarding") {
     statusRibbonEl.textContent = "Doors open";
     messageEl.textContent = "Keep the seat meter above 95% before the doors close.";
+    return;
+  }
+
+  if (state.phase === "riding" && state.seated && state.auntieActive) {
+    statusRibbonEl.textContent = "Auntie wants your seat";
+    messageEl.textContent = "Pretend to sleep.";
     return;
   }
 
@@ -1511,6 +1760,14 @@ function getActionState(now = performance.now()) {
       enabled: countdownCanMove(now),
       label: `SNATCH SEAT!!! ${formatTime(state.boardingRemaining)}`,
       type: "rush",
+    };
+  }
+
+  if (state.phase === "riding" && state.seated && state.auntieActive) {
+    return {
+      enabled: true,
+      label: "Pretend to sleep",
+      type: "sleep",
     };
   }
 
@@ -1622,6 +1879,22 @@ startButtonEl.addEventListener("click", async () => {
 
 actionButtonEl.addEventListener("click", triggerAction);
 
+actionButtonEl.addEventListener("pointerdown", (event) => {
+  if (!isSleepActionActive()) {
+    return;
+  }
+
+  event.preventDefault();
+  startPretendSleep();
+
+  if (typeof actionButtonEl.setPointerCapture === "function") {
+    actionButtonEl.setPointerCapture(event.pointerId);
+  }
+});
+
+window.addEventListener("pointerup", stopPretendSleep);
+window.addEventListener("pointercancel", stopPretendSleep);
+
 successRestartButtonEl.addEventListener("click", resetState);
 
 sensorFallbackEl.addEventListener("click", () => {
@@ -1641,7 +1914,20 @@ window.addEventListener("keydown", (event) => {
 
   if (event.code === "Space") {
     event.preventDefault();
+    if (isSleepActionActive()) {
+      if (!event.repeat) {
+        startPretendSleep();
+      }
+      return;
+    }
+
     triggerAction();
+  }
+});
+
+window.addEventListener("keyup", (event) => {
+  if (event.code === "Space") {
+    stopPretendSleep();
   }
 });
 
