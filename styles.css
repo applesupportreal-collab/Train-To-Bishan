@@ -528,10 +528,45 @@ button {
 }
 
 .action-button {
+  position: relative;
+  overflow: hidden;
   min-height: 82px;
+  border: 3px solid transparent;
   background: var(--green);
   font-size: 1.35rem;
   box-shadow: 0 12px 22px rgba(22, 128, 96, 0.26);
+}
+
+.action-button[data-action="rush"] {
+  border-color: rgba(207, 36, 52, 0.38);
+}
+
+.action-button[data-action="rush"]::before,
+.action-button[data-action="rush"]::after {
+  position: absolute;
+  right: 18px;
+  bottom: 14px;
+  left: 18px;
+  height: 8px;
+  border-radius: 999px;
+  content: "";
+}
+
+.action-button[data-action="rush"]::before {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.action-button[data-action="rush"]::after {
+  width: calc(100% - 36px);
+  background: linear-gradient(90deg, #b91f2d, #e54555);
+  transform: scaleX(var(--seat-progress-ratio, 0));
+  transform-origin: left center;
+  transition: transform 120ms linear;
+}
+
+.action-button.seat-ready {
+  border-color: #f0c344;
+  box-shadow: 0 0 0 4px rgba(240, 195, 68, 0.22), 0 12px 22px rgba(22, 128, 96, 0.26);
 }
 
 .action-button:disabled {

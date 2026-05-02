@@ -27,7 +27,11 @@ const DURATIONS = {
     return getRideDuration();
   },
 };
-const SEAT_TARGET = 32;
+const SEAT_RUSH_CONFIG = {
+  gainPerPress: 0.08,
+  decayPerSecond: 0.08,
+  seatThreshold: 0.95,
+};
 const UPRIGHT = {
   betaMin: 52,
   betaMax: 128,
@@ -66,7 +70,7 @@ const state = {
   arrivalRemaining: DURATIONS.arrival,
   boardingRemaining: DURATIONS.boarding,
   rideRemaining: DURATIONS.ride,
-  rushes: 0,
+  seatProgress: 0,
   seated: false,
   lastActionKey: "none:false",
   motionPermission: "unknown",
@@ -139,6 +143,10 @@ function getStationSegment() {
 
 function randomBetween(min, max) {
   return min + Math.random() * (max - min);
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }
 
 function clampVolume(volume) {
@@ -414,7 +422,7 @@ function resetState() {
   state.arrivalRemaining = DURATIONS.arrival;
   state.boardingRemaining = DURATIONS.boarding;
   state.rideRemaining = DURATIONS.ride;
-  state.rushes = 0;
+  state.seatProgress = 0;
   state.seated = false;
   state.lastActionKey = "none:false";
   state.simulatedUpright = true;
@@ -428,7 +436,7 @@ function startWaiting() {
   state.arrivalRemaining = DURATIONS.arrival;
   state.boardingRemaining = DURATIONS.boarding;
   state.rideRemaining = DURATIONS.ride;
-  state.rushes = 0;
+  state.seatProgress = 0;
   state.seated = false;
   state.lastActionKey = "none:false";
   requestAnimationFrame(tick);
@@ -438,7 +446,7 @@ function startWaiting() {
 function startBoarding() {
   state.phase = "boarding";
   state.boardingRemaining = DURATIONS.boarding;
-  state.rushes = 0;
+  state.seatProgress = 0;
   vibrate([70, 40, 70]);
   render();
 }
@@ -465,15 +473,10 @@ function rush() {
     return;
   }
 
-  state.rushes += 1;
+  state.seatProgress = clamp(state.seatProgress + SEAT_RUSH_CONFIG.gainPerPress, 0, 1);
   queueEl.classList.add("rushing");
   window.setTimeout(() => queueEl.classList.remove("rushing"), 120);
   vibrate(8);
-
-  if (state.rushes >= SEAT_TARGET) {
-    startRide(true);
-    return;
-  }
 
   render();
 }
@@ -504,10 +507,15 @@ function tick(now) {
       }
     } else if (state.phase === "boarding") {
       state.boardingRemaining -= elapsed;
+      state.seatProgress = clamp(
+        state.seatProgress - SEAT_RUSH_CONFIG.decayPerSecond * (elapsed / 1000),
+        0,
+        1,
+      );
 
       if (state.boardingRemaining <= 0) {
         state.boardingRemaining = 0;
-        startRide(false);
+        startRide(state.seatProgress >= SEAT_RUSH_CONFIG.seatThreshold);
       }
     } else if (state.phase === "riding") {
       state.rideRemaining -= elapsed;
@@ -594,7 +602,7 @@ function renderPhaseCopy(paused, upright) {
 
   if (state.phase === "boarding") {
     statusRibbonEl.textContent = "Doors open";
-    messageEl.textContent = "Push through the crowd before every seat is gone.";
+    messageEl.textContent = "Keep the seat meter above 95% before the doors close.";
     return;
   }
 
@@ -718,6 +726,11 @@ function renderActions() {
   actionButtonEl.textContent = action.label;
   actionButtonEl.disabled = !action.enabled;
   actionButtonEl.dataset.action = action.type;
+  actionButtonEl.style.setProperty("--seat-progress-ratio", state.seatProgress.toFixed(3));
+  actionButtonEl.classList.toggle(
+    "seat-ready",
+    state.phase === "boarding" && state.seatProgress >= SEAT_RUSH_CONFIG.seatThreshold,
+  );
 }
 
 startButtonEl.addEventListener("click", async () => {
