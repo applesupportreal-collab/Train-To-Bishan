@@ -1401,6 +1401,7 @@ function render() {
 
   renderDeviceIndicator();
   renderRouteCopy();
+  renderSceneStationSign();
   renderSuccessScreen();
   renderStationSegment();
   renderPhaseCopy(paused, upright);
@@ -1421,10 +1422,22 @@ function renderRouteCopy() {
 
   routeTitleEl.textContent = `Train to ${destination.name}`;
   routeSubtitleEl.textContent = `${origin.name} to ${destination.name} station`;
-  stationSignCodeEl.textContent = origin.code;
-  stationSignNameEl.textContent = origin.name;
   successHeadingEl.textContent = `You Survived Train to ${destination.name}!`;
   successStationCodeEl.textContent = destination.code;
+}
+
+function getSceneStation() {
+  if (state.phase === "riding" || state.phase === "arrived") {
+    return getStationSegment().current;
+  }
+
+  return getOriginStation();
+}
+
+function renderSceneStationSign() {
+  const station = getSceneStation();
+  stationSignCodeEl.textContent = station.code;
+  stationSignNameEl.textContent = station.name;
 }
 
 function renderSuccessScreen() {
