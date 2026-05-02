@@ -10,6 +10,8 @@ Edit `game-config.json` to tune the static game without changing JavaScript.
 - `timing.stationDwellDuration` is how long the train stays stopped at each intermediate station.
 - `upright.betaMin`, `upright.betaMax`, and `upright.gammaMax` control the accepted phone angle range.
 - `upright.checkInterval` controls how often the app re-checks the phone angle, in milliseconds.
+- `audioFade.duration` controls the fade-in and fade-out time for every sound, in milliseconds.
+- `audioFade.tickInterval` controls how often fade volume ramps update, in milliseconds.
 - `startSound` is the sound that plays from the Start button tap.
 - `endSound` is the sound that plays when the player reaches Bishan.
 - `doorClosingSound.leadTime` controls how many milliseconds before train departure the `doors_are_closing.ogg` clip plays.

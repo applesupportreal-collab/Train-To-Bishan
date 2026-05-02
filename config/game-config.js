@@ -67,6 +67,10 @@ window.TRAIN_TO_BISHAN_GAME_CONFIG = {
     defaultVolume: 1,
     maxConcurrent: 1,
   },
+  audioFade: {
+    duration: 1000,
+    tickInterval: 50,
+  },
   startSound: {
     src: "sounds/train_service_ends_at_bishan.ogg",
     volume: 1,

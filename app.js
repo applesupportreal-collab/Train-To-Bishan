@@ -42,6 +42,10 @@ const DEFAULT_GAME_SETTINGS = {
     defaultVolume: 1,
     maxConcurrent: 1,
   },
+  audioFade: {
+    duration: 1_000,
+    tickInterval: 50,
+  },
   startSound: {
     src: "sounds/train_service_ends_at_bishan.ogg",
     volume: 1,
@@ -100,6 +104,7 @@ const DURATIONS = {
 let SEAT_RUSH_CONFIG = { ...DEFAULT_GAME_SETTINGS.seatRush };
 let UPRIGHT = { ...DEFAULT_GAME_SETTINGS.upright };
 let TRAIN_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.trainSound };
+let AUDIO_FADE_CONFIG = { ...DEFAULT_GAME_SETTINGS.audioFade };
 let START_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.startSound };
 let END_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.endSound };
 let DOOR_CLOSING_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.doorClosingSound };
@@ -192,6 +197,10 @@ function applyGameSettings(settings) {
   TRAIN_SOUND_CONFIG = {
     ...DEFAULT_GAME_SETTINGS.trainSound,
     ...readObject(externalSettings.trainSound),
+  };
+  AUDIO_FADE_CONFIG = {
+    ...DEFAULT_GAME_SETTINGS.audioFade,
+    ...readObject(externalSettings.audioFade),
   };
   START_SOUND_CONFIG = {
     ...DEFAULT_GAME_SETTINGS.startSound,
@@ -681,6 +690,193 @@ function logSoundDebug(message, detail = undefined) {
   console.info(`[Train to Bishan sound] ${message}`, detail);
 }
 
+const audioFadeTimers = new WeakMap();
+
+function getAudioFadeDuration() {
+  const configuredDuration = Number(AUDIO_FADE_CONFIG.duration);
+  const fallbackDuration = DEFAULT_GAME_SETTINGS.audioFade.duration;
+  return Number.isFinite(configuredDuration) && configuredDuration >= 0
+    ? configuredDuration
+    : fallbackDuration;
+}
+
+function getAudioFadeTickInterval() {
+  const configuredInterval = Number(AUDIO_FADE_CONFIG.tickInterval);
+  const fallbackInterval = DEFAULT_GAME_SETTINGS.audioFade.tickInterval;
+  return Number.isFinite(configuredInterval) && configuredInterval > 0
+    ? configuredInterval
+    : fallbackInterval;
+}
+
+function getAudioFadeState(audio) {
+  if (!audioFadeTimers.has(audio)) {
+    audioFadeTimers.set(audio, {
+      interval: null,
+      fadeOutTimer: null,
+      metadataHandler: null,
+    });
+  }
+
+  return audioFadeTimers.get(audio);
+}
+
+function clearAudioFadeInterval(audio) {
+  const fadeState = audioFadeTimers.get(audio);
+
+  if (!fadeState?.interval) {
+    return;
+  }
+
+  window.clearInterval(fadeState.interval);
+  fadeState.interval = null;
+}
+
+function clearAudioFadeOutTimer(audio) {
+  const fadeState = audioFadeTimers.get(audio);
+
+  if (!fadeState) {
+    return;
+  }
+
+  if (fadeState.fadeOutTimer) {
+    window.clearTimeout(fadeState.fadeOutTimer);
+    fadeState.fadeOutTimer = null;
+  }
+
+  if (fadeState.metadataHandler) {
+    audio.removeEventListener("loadedmetadata", fadeState.metadataHandler);
+    audio.removeEventListener("durationchange", fadeState.metadataHandler);
+    fadeState.metadataHandler = null;
+  }
+}
+
+function clearAudioFadeTimers(audio) {
+  clearAudioFadeInterval(audio);
+  clearAudioFadeOutTimer(audio);
+  audioFadeTimers.delete(audio);
+}
+
+function fadeAudioVolume(audio, targetVolume, duration, onComplete) {
+  clearAudioFadeInterval(audio);
+
+  const clampedTargetVolume = clampVolume(targetVolume);
+  const fadeDuration = Math.max(0, duration);
+
+  if (audio.muted || fadeDuration <= 0) {
+    audio.volume = audio.muted ? 0 : clampedTargetVolume;
+    onComplete?.();
+    return;
+  }
+
+  const fadeState = getAudioFadeState(audio);
+  const startVolume = audio.volume;
+  const startedAt = performance.now();
+
+  fadeState.interval = window.setInterval(() => {
+    const elapsed = performance.now() - startedAt;
+    const progress = clamp(elapsed / fadeDuration, 0, 1);
+    audio.volume = startVolume + (clampedTargetVolume - startVolume) * progress;
+
+    if (progress >= 1) {
+      clearAudioFadeInterval(audio);
+      onComplete?.();
+    }
+  }, getAudioFadeTickInterval());
+}
+
+function scheduleAudioFadeOut(audio) {
+  clearAudioFadeOutTimer(audio);
+
+  const fadeDuration = getAudioFadeDuration();
+
+  if (audio.muted || fadeDuration <= 0) {
+    return;
+  }
+
+  const schedule = () => {
+    const durationSeconds = audio.duration;
+
+    if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+      return;
+    }
+
+    const remainingMs = Math.max(0, (durationSeconds - audio.currentTime) * 1000);
+    const durationMs = durationSeconds * 1000;
+    const effectiveFadeDuration = Math.min(fadeDuration, durationMs / 2);
+    const fadeStartDelay = Math.max(0, remainingMs - effectiveFadeDuration);
+    const fadeState = getAudioFadeState(audio);
+
+    clearAudioFadeOutTimer(audio);
+    fadeState.fadeOutTimer = window.setTimeout(() => {
+      if (audio.paused || audio.ended) {
+        return;
+      }
+
+      const latestRemainingMs = Math.max(0, (audio.duration - audio.currentTime) * 1000);
+      fadeAudioVolume(audio, 0, Math.min(effectiveFadeDuration, latestRemainingMs));
+    }, fadeStartDelay);
+  };
+
+  if (Number.isFinite(audio.duration) && audio.duration > 0) {
+    schedule();
+    return;
+  }
+
+  const fadeState = getAudioFadeState(audio);
+  fadeState.metadataHandler = schedule;
+  audio.addEventListener("loadedmetadata", schedule, { once: true });
+  audio.addEventListener("durationchange", schedule, { once: true });
+}
+
+function prepareAudioForPlayback(audio, targetVolume) {
+  const clampedTargetVolume = clampVolume(targetVolume);
+
+  if (audio.muted || getAudioFadeDuration() <= 0) {
+    audio.volume = audio.muted ? 0 : clampedTargetVolume;
+    return clampedTargetVolume;
+  }
+
+  audio.volume = 0;
+  return clampedTargetVolume;
+}
+
+function startAudioFades(audio, targetVolume) {
+  const clampedTargetVolume = clampVolume(targetVolume);
+
+  if (audio.muted) {
+    audio.volume = 0;
+    return;
+  }
+
+  const fadeDuration = getAudioFadeDuration();
+
+  if (fadeDuration <= 0) {
+    audio.volume = clampedTargetVolume;
+    return;
+  }
+
+  fadeAudioVolume(audio, clampedTargetVolume, fadeDuration);
+  scheduleAudioFadeOut(audio);
+}
+
+function disposeAudio(audio) {
+  clearAudioFadeTimers(audio);
+  audio.pause();
+  audio.removeAttribute("src");
+  audio.load();
+}
+
+function stopAudioWithFade(audio, onStopped) {
+  clearAudioFadeOutTimer(audio);
+
+  if (audio.muted || audio.paused || audio.ended || getAudioFadeDuration() <= 0) {
+    onStopped?.();
+    return;
+  }
+
+  fadeAudioVolume(audio, 0, getAudioFadeDuration(), onStopped);
+}
+
 function getTrainSoundEffects() {
   const configuredEffects = Array.isArray(window.TRAIN_SOUND_EFFECTS)
     ? window.TRAIN_SOUND_EFFECTS
@@ -715,10 +911,9 @@ function clearStartSound() {
     return;
   }
 
-  activeStartSound.pause();
-  activeStartSound.removeAttribute("src");
-  activeStartSound.load();
+  const audio = activeStartSound;
   activeStartSound = null;
+  stopAudioWithFade(audio, () => disposeAudio(audio));
 }
 
 function clearEndSound() {
@@ -726,10 +921,9 @@ function clearEndSound() {
     return;
   }
 
-  activeEndSound.pause();
-  activeEndSound.removeAttribute("src");
-  activeEndSound.load();
+  const audio = activeEndSound;
   activeEndSound = null;
+  stopAudioWithFade(audio, () => disposeAudio(audio));
 }
 
 function playStartSound() {
@@ -744,7 +938,7 @@ function playStartSound() {
   logSoundDebug("Playing start sound.", { src });
 
   const audio = new Audio(src);
-  audio.volume = clampVolume(START_SOUND_CONFIG.volume ?? 1);
+  const targetVolume = prepareAudioForPlayback(audio, START_SOUND_CONFIG.volume ?? 1);
   audio.preload = "auto";
   audio.playsInline = true;
   activeStartSound = audio;
@@ -753,6 +947,8 @@ function playStartSound() {
     if (activeStartSound === audio) {
       activeStartSound = null;
     }
+
+    disposeAudio(audio);
   });
 
   audio.addEventListener("error", () => {
@@ -760,6 +956,7 @@ function playStartSound() {
       activeStartSound = null;
     }
 
+    disposeAudio(audio);
     logSoundDebug("Start sound failed to load.", { src });
   });
 
@@ -768,6 +965,7 @@ function playStartSound() {
   if (playAttempt) {
     playAttempt
       .then(() => {
+        startAudioFades(audio, targetVolume);
         logSoundDebug("Start sound playback started.", { src });
       })
       .catch((error) => {
@@ -778,6 +976,7 @@ function playStartSound() {
         if (activeStartSound === audio) {
           activeStartSound = null;
         }
+        disposeAudio(audio);
       });
   }
 }
@@ -794,7 +993,7 @@ function playEndSound() {
   logSoundDebug("Playing end sound.", { src });
 
   const audio = new Audio(src);
-  audio.volume = clampVolume(END_SOUND_CONFIG.volume ?? 1);
+  const targetVolume = prepareAudioForPlayback(audio, END_SOUND_CONFIG.volume ?? 1);
   audio.preload = "auto";
   audio.playsInline = true;
   activeEndSound = audio;
@@ -803,6 +1002,8 @@ function playEndSound() {
     if (activeEndSound === audio) {
       activeEndSound = null;
     }
+
+    disposeAudio(audio);
   });
 
   audio.addEventListener("error", () => {
@@ -810,6 +1011,7 @@ function playEndSound() {
       activeEndSound = null;
     }
 
+    disposeAudio(audio);
     logSoundDebug("End sound failed to load.", { src });
   });
 
@@ -818,6 +1020,7 @@ function playEndSound() {
   if (playAttempt) {
     playAttempt
       .then(() => {
+        startAudioFades(audio, targetVolume);
         logSoundDebug("End sound playback started.", { src });
       })
       .catch((error) => {
@@ -828,6 +1031,7 @@ function playEndSound() {
         if (activeEndSound === audio) {
           activeEndSound = null;
         }
+        disposeAudio(audio);
       });
   }
 }
@@ -847,10 +1051,9 @@ function createDoorClosingSoundPlayer() {
       return;
     }
 
-    activeAudio.pause();
-    activeAudio.removeAttribute("src");
-    activeAudio.load();
+    const audio = activeAudio;
     activeAudio = null;
+    stopAudioWithFade(audio, () => disposeAudio(audio));
   }
 
   function createAudio(muted = false) {
@@ -908,12 +1111,18 @@ function createDoorClosingSoundPlayer() {
       logSoundDebug("Playing door closing sound.", { src: getSrc() });
 
       const audio = createAudio();
+      const targetVolume = prepareAudioForPlayback(
+        audio,
+        DOOR_CLOSING_SOUND_CONFIG.volume ?? 1,
+      );
       activeAudio = audio;
 
       audio.addEventListener("ended", () => {
         if (activeAudio === audio) {
           activeAudio = null;
         }
+
+        disposeAudio(audio);
       });
 
       audio.addEventListener("error", () => {
@@ -922,6 +1131,7 @@ function createDoorClosingSoundPlayer() {
         }
 
         pending = false;
+        disposeAudio(audio);
         logSoundDebug("Door closing sound failed to load.", { src: getSrc() });
       });
 
@@ -931,6 +1141,7 @@ function createDoorClosingSoundPlayer() {
         playAttempt
           .then(() => {
             pending = false;
+            startAudioFades(audio, targetVolume);
             logSoundDebug("Door closing sound playback started.", { src: getSrc() });
           })
           .catch((error) => {
@@ -994,10 +1205,8 @@ function createStationAnnouncementPlayer() {
   const activeAudio = new Set();
 
   function clearAudio(audio) {
-    audio.pause();
-    audio.removeAttribute("src");
-    audio.load();
     activeAudio.delete(audio);
+    stopAudioWithFade(audio, () => disposeAudio(audio));
   }
 
   function createAudio(station, type, muted = false) {
@@ -1046,6 +1255,7 @@ function createStationAnnouncementPlayer() {
       this.blocked = false;
 
       const audio = createAudio(station, type);
+      const targetVolume = prepareAudioForPlayback(audio, ANNOUNCEMENT_CONFIG.volume);
       activeAudio.add(audio);
       const src = audio.src;
       logSoundDebug("Playing station announcement.", {
@@ -1079,6 +1289,7 @@ function createStationAnnouncementPlayer() {
             if (isPending(station, type)) {
               pendingAnnouncement = null;
             }
+            startAudioFades(audio, targetVolume);
             logSoundDebug("Station announcement playback started.", {
               type,
               station: station.name,
@@ -1145,10 +1356,8 @@ function createTrainSoundscape() {
   }
 
   function clearAudio(audio) {
-    audio.pause();
-    audio.removeAttribute("src");
-    audio.load();
     activeAudio.delete(audio);
+    stopAudioWithFade(audio, () => disposeAudio(audio));
   }
 
   return {
@@ -1247,7 +1456,7 @@ function createTrainSoundscape() {
       const effect = effects[Math.floor(Math.random() * effects.length)];
       const audio = new Audio(effect.src);
       const src = effect.src;
-      audio.volume = effect.volume;
+      const targetVolume = prepareAudioForPlayback(audio, effect.volume);
       audio.preload = "auto";
       audio.playsInline = true;
 
@@ -1275,6 +1484,7 @@ function createTrainSoundscape() {
       if (playAttempt) {
         playAttempt
           .then(() => {
+            startAudioFades(audio, targetVolume);
             logSoundDebug("Random train sound playback started.", { src });
           })
           .catch((error) => {
