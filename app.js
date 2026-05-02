@@ -87,7 +87,7 @@ const DEFAULT_GAME_SETTINGS = {
   auntieEvent: {
     chance: 0.2,
     imageSrc: "assets/auntie.png",
-    scoldAfter: 3_000,
+    scoldAfter: 5_000,
     minDuration: 20_000,
     maxDuration: 30_000,
     fadeDuration: 700,
@@ -414,6 +414,7 @@ const queueEl = document.querySelector("#queue");
 const trainInteriorEl = document.querySelector("#trainInterior");
 const auntieEventEl = document.querySelector("#auntieEvent");
 const auntieImageEl = document.querySelector("#auntieImage");
+const auntieVignetteEl = document.querySelector("#auntieVignette");
 const sleepDimEl = document.querySelector("#sleepDim");
 const statusRibbonEl = document.querySelector("#statusRibbon");
 const metersEl = document.querySelector("#meters");
@@ -803,6 +804,14 @@ function stopPretendSleep() {
 function isSleepActionActive() {
   const action = getActionState();
   return action.enabled && action.type === "sleep";
+}
+
+function getAuntieVignetteLevel() {
+  if (!state.auntieActive || state.auntieDimLevel > getAuntieEyesOpenThreshold()) {
+    return 0;
+  }
+
+  return clamp(state.auntieOpenElapsed / getAuntieScoldAfter(), 0, 1);
 }
 
 function extendStationDwell(stationSegment, extensionDuration) {
@@ -3005,6 +3014,7 @@ function renderStationSegment() {
 }
 
 function renderAuntieEvent() {
+  auntieVignetteEl.style.opacity = getAuntieVignetteLevel().toFixed(3);
   sleepDimEl.style.opacity = state.auntieDimLevel.toFixed(3);
   auntieImageEl.src = getAuntieImageSrc();
   auntieEventEl.style.setProperty(

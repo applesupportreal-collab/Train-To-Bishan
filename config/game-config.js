@@ -109,7 +109,7 @@ window.TRAIN_TO_BISHAN_GAME_CONFIG = {
   auntieEvent: {
     chance: 0.2,
     imageSrc: "assets/auntie.png",
-    scoldAfter: 3000,
+    scoldAfter: 5000,
     minDuration: 20000,
     maxDuration: 30000,
     fadeDuration: 700,
