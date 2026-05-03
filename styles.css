@@ -366,11 +366,11 @@ button {
   margin: 0;
   color: #26313a;
   font-size: 1rem;
-  font-weight: 800;
+  font-weight: 500;
   line-height: 1.35;
 }
 
-.credits-content a {
+.credits-content a:not(.primary):not(.secondary) {
   color: var(--red);
   text-decoration-thickness: 2px;
   text-underline-offset: 3px;
