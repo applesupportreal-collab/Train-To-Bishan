@@ -3957,7 +3957,7 @@ function renderPhaseCopy(paused, upright) {
 
   if (state.phase === "riding" && state.seated && state.auntieActive) {
     statusRibbonEl.textContent = "Auntie wants your seat";
-    messageEl.textContent = "Pretend to sleep.";
+    messageEl.textContent = "Press and hold the button until auntie goes away!";
     return;
   }
 
