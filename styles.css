@@ -175,6 +175,19 @@ button {
   text-decoration: none;
 }
 
+.challenge-link {
+  min-height: 66px;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.post-link {
+  width: 100%;
+  margin-top: 12px;
+  padding: 0 16px;
+  text-align: center;
+}
+
 .settings-screen {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
