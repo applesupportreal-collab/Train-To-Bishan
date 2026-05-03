@@ -40,7 +40,7 @@ const DEFAULT_GAME_SETTINGS = {
     checkInterval: 300,
   },
   trainSound: {
-    minDelay: 30_000,
+    minDelay: 45_000,
     firstMinDelay: 30_000,
     firstMaxDelay: 45_000,
     retryMinDelay: 1_500,

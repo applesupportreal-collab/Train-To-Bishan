@@ -62,7 +62,7 @@ window.TRAIN_TO_BISHAN_GAME_CONFIG = {
     checkInterval: 300,
   },
   trainSound: {
-    minDelay: 30000,
+    minDelay: 45000,
     firstMinDelay: 30000,
     firstMaxDelay: 45000,
     retryMinDelay: 1500,
