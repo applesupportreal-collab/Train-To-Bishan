@@ -1331,8 +1331,8 @@ function hasCustomStationDurationValues(baseSeconds) {
 function readStationDurationSettings(globalDuration) {
   const globalSeconds = msToSeconds(globalDuration);
   const durations = getStationDurationInputEls().map((input) => {
-    const value = Number(input.value);
-    return secondsToMs(Number.isFinite(value) ? value : globalSeconds);
+    const value = readNumberInput(input, globalSeconds);
+    return secondsToMs(value);
   });
 
   return durations.some((duration) => duration !== globalDuration) ? durations : [];
@@ -1533,21 +1533,34 @@ function handleBetweenStationsChange(event) {
   previousBetweenStationsSettingValue = formatSettingValue(nextSeconds);
 }
 
-function readSettingNumber(key, fallback) {
-  const input = getSettingInput(key);
-  const value = Number(input?.value);
+function readNumberInput(input, fallback) {
+  const rawValue = typeof input?.value === "string" ? input.value.trim() : "";
+
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const value = Number(rawValue);
 
   if (!Number.isFinite(value)) {
     return fallback;
   }
 
-  const min = Number(input?.min);
-  const max = Number(input?.max);
+  const rawMin = input.getAttribute("min");
+  const rawMax = input.getAttribute("max");
+  const min = rawMin === null || rawMin === "" ? Number.NEGATIVE_INFINITY : Number(rawMin);
+  const max = rawMax === null || rawMax === "" ? Number.POSITIVE_INFINITY : Number(rawMax);
+
   return clamp(
     value,
     Number.isFinite(min) ? min : Number.NEGATIVE_INFINITY,
     Number.isFinite(max) ? max : Number.POSITIVE_INFINITY,
   );
+}
+
+function readSettingNumber(key, fallback) {
+  const input = getSettingInput(key);
+  return readNumberInput(input, fallback);
 }
 
 function populateSettingsForm() {
