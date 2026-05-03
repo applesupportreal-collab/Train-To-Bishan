@@ -433,6 +433,7 @@ async function loadGameSettings() {
 }
 
 const gameEl = document.querySelector(".game");
+const sceneEl = document.querySelector(".scene");
 const trainEl = document.querySelector("#train");
 const queueEl = document.querySelector("#queue");
 const trainInteriorEl = document.querySelector("#trainInterior");
@@ -3899,6 +3900,7 @@ function render() {
   );
   trainEl.classList.toggle("arrived", state.phase !== "idle" && state.arrivalRemaining <= 0);
   trainEl.classList.toggle("boarding", state.phase === "boarding");
+  sceneEl.classList.toggle("doors-open", state.phase === "boarding");
   queueEl.classList.toggle("hidden", state.phase === "riding" || state.phase === "arrived");
   trainInteriorEl.hidden = state.phase !== "riding" && state.phase !== "arrived";
   statusRibbonEl.classList.remove("success", "danger");
