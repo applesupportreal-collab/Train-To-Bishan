@@ -85,7 +85,7 @@
 
         <form class="settings-form" id="settingsForm">
           <p class="settings-note">
-            Settings are saved in this browser using localStorage. They are not stored with cookies.
+            Settings are saved locally in this browser using localStorage.
           </p>
           <fieldset>
             <legend>Timing</legend>
@@ -118,30 +118,6 @@
                 <div class="station-duration-settings" id="stationDurationSettings"></div>
               </div>
             </details>
-          </fieldset>
-
-          <fieldset>
-            <legend>Seat Rush</legend>
-            <label>
-              <span>Gain per tap</span>
-              <input data-setting="seatRush.gainPerPress" type="number" min="1" max="100" step="1" required />
-              <small>%</small>
-            </label>
-            <label>
-              <span>Decay per second</span>
-              <input data-setting="seatRush.decayPerSecond" type="number" min="0" max="100" step="1" required />
-              <small>%</small>
-            </label>
-            <label>
-              <span>Seat threshold</span>
-              <input data-setting="seatRush.seatThreshold" type="number" min="1" max="100" step="1" required />
-              <small>%</small>
-            </label>
-            <label>
-              <span>Station seat chance</span>
-              <input data-setting="seatOffer.chance" type="number" min="0" max="100" step="1" required />
-              <small>%</small>
-            </label>
           </fieldset>
 
           <fieldset>
@@ -186,97 +162,129 @@
           </fieldset>
 
           <fieldset>
-            <legend>Auntie</legend>
-            <label>
-              <span>Appearance chance</span>
-              <input data-setting="auntieEvent.chance" type="number" min="0" max="100" step="1" required />
-              <small>%</small>
-            </label>
-            <label>
-              <span>Scold timer</span>
-              <input data-setting="auntieEvent.scoldAfter" type="number" min="0.5" step="0.5" required />
-              <small>s</small>
-            </label>
-            <label>
-              <span>Minimum stay</span>
-              <input data-setting="auntieEvent.minDuration" type="number" min="0" step="0.5" required />
-              <small>s</small>
-            </label>
-            <label>
-              <span>Maximum stay</span>
-              <input data-setting="auntieEvent.maxDuration" type="number" min="0" step="0.5" required />
-              <small>s</small>
-            </label>
-            <label>
-              <span>Sleep fade</span>
-              <input data-setting="auntieEvent.fadeDuration" type="number" min="0" step="0.1" required />
-              <small>s</small>
-            </label>
-            <label>
-              <span>Open eye threshold</span>
-              <input data-setting="auntieEvent.eyesOpenThreshold" type="number" min="0" max="100" step="1" required />
-              <small>%</small>
-            </label>
-            <label>
-              <span>Slide duration</span>
-              <input data-setting="auntieEvent.slideDuration" type="number" min="0" step="0.1" required />
-              <small>s</small>
-            </label>
-          </fieldset>
-
-          <fieldset>
-            <legend>Breakdown</legend>
-            <label>
-              <span>Breakdown chance</span>
-              <input data-setting="trainBreakdown.chance" type="number" min="0" max="100" step="1" required />
-              <small>%</small>
-            </label>
-            <label>
-              <span>Breakdown min steps</span>
-              <input data-setting="trainBreakdown.minSteps" type="number" min="1" step="1" required />
-              <small>steps</small>
-            </label>
-            <label>
-              <span>Breakdown max steps</span>
-              <input data-setting="trainBreakdown.maxSteps" type="number" min="1" step="1" required />
-              <small>steps</small>
-            </label>
-            <label>
-              <span>Breakdown tap steps</span>
-              <input data-setting="trainBreakdown.manualStepsPerPress" type="number" min="1" step="1" required />
-              <small>steps</small>
-            </label>
-          </fieldset>
-
-          <fieldset>
-            <legend>Train Delay</legend>
-            <label>
-              <span>Delay chance</span>
-              <input data-setting="trainDelay.chance" type="number" min="0" max="100" step="1" required />
-              <small>%</small>
-            </label>
-            <label>
-              <span>Extra stop time</span>
-              <input data-setting="trainDelay.extensionDuration" type="number" min="0" step="0.5" required />
-              <small>s</small>
-            </label>
+            <legend>Events</legend>
+            <details class="advanced-settings">
+              <summary>Seat Snatching</summary>
+              <div class="advanced-settings-body">
+                <label>
+                  <span>Gain per tap</span>
+                  <input data-setting="seatRush.gainPerPress" type="number" min="1" max="100" step="1" required />
+                  <small>%</small>
+                </label>
+                <label>
+                  <span>Decay per second</span>
+                  <input data-setting="seatRush.decayPerSecond" type="number" min="0" max="100" step="1" required />
+                  <small>%</small>
+                </label>
+                <label>
+                  <span>Seat threshold</span>
+                  <input data-setting="seatRush.seatThreshold" type="number" min="1" max="100" step="1" required />
+                  <small>%</small>
+                </label>
+                <label>
+                  <span>Station seat chance</span>
+                  <input data-setting="seatOffer.chance" type="number" min="0" max="100" step="1" required />
+                  <small>%</small>
+                </label>
+              </div>
+            </details>
+            <details class="advanced-settings">
+              <summary>Auntie Demanding Seat</summary>
+              <div class="advanced-settings-body">
+                <label>
+                  <span>Appearance chance</span>
+                  <input data-setting="auntieEvent.chance" type="number" min="0" max="100" step="1" required />
+                  <small>%</small>
+                </label>
+                <label>
+                  <span>Scold timer</span>
+                  <input data-setting="auntieEvent.scoldAfter" type="number" min="0" step="0.5" required />
+                  <small>s</small>
+                </label>
+                <label>
+                  <span>Minimum stay</span>
+                  <input data-setting="auntieEvent.minDuration" type="number" min="0" step="0.5" required />
+                  <small>s</small>
+                </label>
+                <label>
+                  <span>Maximum stay</span>
+                  <input data-setting="auntieEvent.maxDuration" type="number" min="0" step="0.5" required />
+                  <small>s</small>
+                </label>
+                <label>
+                  <span>Sleep fade</span>
+                  <input data-setting="auntieEvent.fadeDuration" type="number" min="0" step="0.1" required />
+                  <small>s</small>
+                </label>
+                <label>
+                  <span>Open eye threshold</span>
+                  <input data-setting="auntieEvent.eyesOpenThreshold" type="number" min="0" max="100" step="1" required />
+                  <small>%</small>
+                </label>
+                <label>
+                  <span>Slide duration</span>
+                  <input data-setting="auntieEvent.slideDuration" type="number" min="0" step="0.1" required />
+                  <small>s</small>
+                </label>
+              </div>
+            </details>
+            <details class="advanced-settings">
+              <summary>Breakdown</summary>
+              <div class="advanced-settings-body">
+                <label>
+                  <span>Breakdown chance</span>
+                  <input data-setting="trainBreakdown.chance" type="number" min="0" max="100" step="1" required />
+                  <small>%</small>
+                </label>
+                <label>
+                  <span>Breakdown min steps</span>
+                  <input data-setting="trainBreakdown.minSteps" type="number" min="1" step="1" required />
+                  <small>steps</small>
+                </label>
+                <label>
+                  <span>Breakdown max steps</span>
+                  <input data-setting="trainBreakdown.maxSteps" type="number" min="1" step="1" required />
+                  <small>steps</small>
+                </label>
+                <label>
+                  <span>Breakdown tap steps</span>
+                  <input data-setting="trainBreakdown.manualStepsPerPress" type="number" min="1" step="1" required />
+                  <small>steps</small>
+                </label>
+              </div>
+            </details>
+            <details class="advanced-settings">
+              <summary>Train Delay</summary>
+              <div class="advanced-settings-body">
+                <label>
+                  <span>Delay chance</span>
+                  <input data-setting="trainDelay.chance" type="number" min="0" max="100" step="1" required />
+                  <small>%</small>
+                </label>
+                <label>
+                  <span>Extra stop time</span>
+                  <input data-setting="trainDelay.extensionDuration" type="number" min="0" step="0.5" required />
+                  <small>s</small>
+                </label>
+              </div>
+            </details>
           </fieldset>
 
           <fieldset>
             <legend>Audio</legend>
+            <label>
+              <span>Master volume</span>
+              <input data-setting="audio.masterVolume" type="number" min="0" max="100" step="1" required />
+              <small>%</small>
+            </label>
             <label>
               <span>Fade duration</span>
               <input data-setting="audioFade.duration" type="number" min="0" step="0.1" required />
               <small>s</small>
             </label>
             <label>
-              <span>Random cabin noise minimum</span>
-              <input data-setting="trainSound.minDelay" type="number" min="30" step="0.5" required />
-              <small>s</small>
-            </label>
-            <label>
-              <span>Random cabin noise maximum</span>
-              <input data-setting="trainSound.maxDelay" type="number" min="30" step="0.5" required />
+              <span>Frequency of Random Cabin Noise (minimum)</span>
+              <input data-setting="trainSound.minDelay" type="number" min="30" max="60" step="0.5" required />
               <small>s</small>
             </label>
             <label>
@@ -290,12 +298,7 @@
               <small>s</small>
             </label>
             <label>
-              <span>Master volume</span>
-              <input data-setting="audio.masterVolume" type="number" min="0" max="100" step="1" required />
-              <small>%</small>
-            </label>
-            <label>
-              <span>Max random cabin noises</span>
+              <span>Max simultaneous random cabin noises</span>
               <input data-setting="trainSound.maxConcurrent" type="number" min="1" step="1" required />
               <small>max</small>
             </label>

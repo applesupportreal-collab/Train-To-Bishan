@@ -351,6 +351,11 @@ button {
   font-size: 1.35rem;
 }
 
+.preview-button.active {
+  background: #26313a;
+  color: #fff9ea;
+}
+
 .upright-visual {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -62,13 +62,12 @@ window.TRAIN_TO_BISHAN_GAME_CONFIG = {
   },
   trainSound: {
     minDelay: 30000,
-    maxDelay: 45000,
     firstMinDelay: 30000,
     firstMaxDelay: 45000,
     retryMinDelay: 1500,
     retryMaxDelay: 3000,
     defaultVolume: 1,
-    maxConcurrent: 1,
+    maxConcurrent: 2,
   },
   audioFade: {
     duration: 500,

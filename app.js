@@ -40,13 +40,12 @@ const DEFAULT_GAME_SETTINGS = {
   },
   trainSound: {
     minDelay: 30_000,
-    maxDelay: 45_000,
     firstMinDelay: 30_000,
     firstMaxDelay: 45_000,
     retryMinDelay: 1_500,
     retryMaxDelay: 3_000,
     defaultVolume: 1,
-    maxConcurrent: 1,
+    maxConcurrent: 2,
   },
   audioFade: {
     duration: 500,
@@ -296,14 +295,12 @@ function applyGameSettings(settings) {
     ...DEFAULT_GAME_SETTINGS.trainSound,
     ...readObject(externalSettings.trainSound),
   };
-  TRAIN_SOUND_CONFIG.minDelay = Math.max(
-    RANDOM_TRAIN_SOUND_MIN_GAP,
+  TRAIN_SOUND_CONFIG.minDelay = clamp(
     readFiniteNumber(TRAIN_SOUND_CONFIG.minDelay, DEFAULT_GAME_SETTINGS.trainSound.minDelay),
+    RANDOM_TRAIN_SOUND_MIN_GAP,
+    60_000,
   );
-  TRAIN_SOUND_CONFIG.maxDelay = Math.max(
-    TRAIN_SOUND_CONFIG.minDelay,
-    readFiniteNumber(TRAIN_SOUND_CONFIG.maxDelay, DEFAULT_GAME_SETTINGS.trainSound.maxDelay),
-  );
+  TRAIN_SOUND_CONFIG.maxDelay = getRandomCabinNoiseMaxDelay(TRAIN_SOUND_CONFIG.minDelay);
   TRAIN_SOUND_CONFIG.firstMinDelay = Math.max(
     RANDOM_TRAIN_SOUND_MIN_GAP,
     readFiniteNumber(
@@ -480,6 +477,7 @@ let statusTextClearTimer = null;
 let rushShakeTimer = null;
 let previousBetweenStationsSettingValue = "";
 let activeSettingsPreviewAudio = null;
+let activeSettingsPreviewButton = null;
 
 const state = {
   phase: "idle",
@@ -1250,6 +1248,11 @@ function percentToRatio(percent) {
   return clamp(Number(percent) / 100, 0, 1);
 }
 
+function getRandomCabinNoiseMaxDelay(minDelay) {
+  const minSeconds = msToSeconds(minDelay);
+  return secondsToMs(Math.min(60, minSeconds * 0.8 + 12));
+}
+
 function formatSettingValue(value) {
   const numericValue = Number(value);
 
@@ -1348,13 +1351,37 @@ function getPreviewVolume(key, fallbackVolume) {
   );
 }
 
-function stopSettingsPreviewAudio() {
-  if (!activeSettingsPreviewAudio) {
+function setSettingsPreviewButtonState(button, isPlaying) {
+  if (!button) {
     return;
   }
 
-  disposeAudio(activeSettingsPreviewAudio);
-  activeSettingsPreviewAudio = null;
+  if (isPlaying) {
+    button.dataset.idleLabel = button.getAttribute("aria-label") ?? "";
+    button.textContent = "stop";
+    button.setAttribute("aria-label", "Stop audio preview");
+    button.classList.add("active");
+    return;
+  }
+
+  button.textContent = "play_arrow";
+  button.classList.remove("active");
+
+  if (button.dataset.idleLabel) {
+    button.setAttribute("aria-label", button.dataset.idleLabel);
+  }
+
+  delete button.dataset.idleLabel;
+}
+
+function stopSettingsPreviewAudio() {
+  if (activeSettingsPreviewAudio) {
+    disposeAudio(activeSettingsPreviewAudio);
+    activeSettingsPreviewAudio = null;
+  }
+
+  setSettingsPreviewButtonState(activeSettingsPreviewButton, false);
+  activeSettingsPreviewButton = null;
 }
 
 function getSettingsPreviewSound(previewType) {
@@ -1415,7 +1442,23 @@ function getSettingsPreviewSound(previewType) {
   }
 }
 
-function playSettingsAudioPreview(previewType) {
+function clearFinishedSettingsPreview(audio, button) {
+  if (activeSettingsPreviewAudio === audio) {
+    activeSettingsPreviewAudio = null;
+  }
+
+  if (activeSettingsPreviewButton === button) {
+    setSettingsPreviewButtonState(button, false);
+    activeSettingsPreviewButton = null;
+  }
+}
+
+function playSettingsAudioPreview(previewType, button) {
+  if (activeSettingsPreviewAudio && activeSettingsPreviewButton === button) {
+    stopSettingsPreviewAudio();
+    return;
+  }
+
   const preview = getSettingsPreviewSound(previewType);
   const src = typeof preview?.src === "string" ? preview.src.trim() : "";
 
@@ -1431,13 +1474,13 @@ function playSettingsAudioPreview(previewType) {
   audio.playsInline = true;
   audio.volume = clampVolume(preview.volume);
   activeSettingsPreviewAudio = audio;
+  activeSettingsPreviewButton = button;
+  setSettingsPreviewButtonState(button, true);
 
   audio.addEventListener(
     "ended",
     () => {
-      if (activeSettingsPreviewAudio === audio) {
-        activeSettingsPreviewAudio = null;
-      }
+      clearFinishedSettingsPreview(audio, button);
       disposeAudio(audio);
     },
     { once: true },
@@ -1446,9 +1489,7 @@ function playSettingsAudioPreview(previewType) {
   audio.addEventListener(
     "error",
     () => {
-      if (activeSettingsPreviewAudio === audio) {
-        activeSettingsPreviewAudio = null;
-      }
+      clearFinishedSettingsPreview(audio, button);
       disposeAudio(audio);
       logSoundDebug("Settings preview failed to load.", { previewType, src });
     },
@@ -1461,9 +1502,7 @@ function playSettingsAudioPreview(previewType) {
       logSoundDebug("Settings preview playback started.", { previewType, src });
     })
     .catch((error) => {
-      if (activeSettingsPreviewAudio === audio) {
-        activeSettingsPreviewAudio = null;
-      }
+      clearFinishedSettingsPreview(audio, button);
       disposeAudio(audio);
       logSoundDebug("Settings preview playback was blocked or failed.", {
         previewType,
@@ -1497,7 +1536,18 @@ function handleBetweenStationsChange(event) {
 function readSettingNumber(key, fallback) {
   const input = getSettingInput(key);
   const value = Number(input?.value);
-  return Number.isFinite(value) ? value : fallback;
+
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+
+  const min = Number(input?.min);
+  const max = Number(input?.max);
+  return clamp(
+    value,
+    Number.isFinite(min) ? min : Number.NEGATIVE_INFINITY,
+    Number.isFinite(max) ? max : Number.POSITIVE_INFINITY,
+  );
 }
 
 function populateSettingsForm() {
@@ -1543,7 +1593,6 @@ function populateSettingsForm() {
   setSettingInputValue("auntieEvent.slideDuration", msToSeconds(getAuntieSlideDuration()));
   setSettingInputValue("audioFade.duration", msToSeconds(getAudioFadeDuration()));
   setSettingInputValue("trainSound.minDelay", msToSeconds(TRAIN_SOUND_CONFIG.minDelay));
-  setSettingInputValue("trainSound.maxDelay", msToSeconds(TRAIN_SOUND_CONFIG.maxDelay));
   setSettingInputValue(
     "announcement.arrivingLeadTime",
     msToSeconds(getArrivingLeadTime()),
@@ -1600,9 +1649,6 @@ function readSettingsForm() {
   );
   const randomSoundMinDelay = secondsToMs(
     readSettingNumber("trainSound.minDelay", msToSeconds(TRAIN_SOUND_CONFIG.minDelay)),
-  );
-  const randomSoundMaxDelay = secondsToMs(
-    readSettingNumber("trainSound.maxDelay", msToSeconds(TRAIN_SOUND_CONFIG.maxDelay)),
   );
 
   return {
@@ -1680,8 +1726,8 @@ function readSettingsForm() {
       ),
     },
     trainSound: {
-      minDelay: Math.min(randomSoundMinDelay, randomSoundMaxDelay),
-      maxDelay: Math.max(randomSoundMinDelay, randomSoundMaxDelay),
+      minDelay: randomSoundMinDelay,
+      maxDelay: getRandomCabinNoiseMaxDelay(randomSoundMinDelay),
       defaultVolume: percentToRatio(
         readSettingNumber(
           "trainSound.defaultVolume",
@@ -4047,7 +4093,7 @@ settingsFormEl.addEventListener("click", (event) => {
     return;
   }
 
-  playSettingsAudioPreview(previewButton.dataset.previewSound);
+  playSettingsAudioPreview(previewButton.dataset.previewSound, previewButton);
 });
 
 actionButtonEl.addEventListener("click", triggerAction);
