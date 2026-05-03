@@ -51,7 +51,8 @@
     "seatThreshold": 0.95
   },
   "seatOffer": {
-    "chance": 0.4
+    "chance": 0.4,
+    "duration": 10000
   },
   "upright": {
     "betaMin": 48,

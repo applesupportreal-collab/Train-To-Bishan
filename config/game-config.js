@@ -52,6 +52,7 @@ window.TRAIN_TO_BISHAN_GAME_CONFIG = {
   },
   seatOffer: {
     chance: 0.4,
+    duration: 10000,
   },
   upright: {
     betaMin: 48,

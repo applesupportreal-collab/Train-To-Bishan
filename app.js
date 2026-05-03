@@ -30,6 +30,7 @@ const DEFAULT_GAME_SETTINGS = {
   },
   seatOffer: {
     chance: 0.4,
+    duration: 10_000,
   },
   upright: {
     betaMin: 48,
@@ -651,6 +652,14 @@ function getSeatOfferChance() {
   return Number.isFinite(configuredChance) ? clamp(configuredChance, 0, 1) : fallbackChance;
 }
 
+function getSeatOfferDuration() {
+  const configuredDuration = Number(SEAT_OFFER_CONFIG.duration);
+  const fallbackDuration = DEFAULT_GAME_SETTINGS.seatOffer.duration;
+  return Number.isFinite(configuredDuration) && configuredDuration >= 0
+    ? configuredDuration
+    : fallbackDuration;
+}
+
 function getTrainBreakdownChance() {
   const configuredChance = Number(TRAIN_BREAKDOWN_CONFIG.chance);
   const fallbackChance = DEFAULT_GAME_SETTINGS.trainBreakdown.chance;
@@ -1114,7 +1123,7 @@ function startStationSeatOffer(stationSegment) {
 
   hideStatusText(true);
   state.seatOfferActive = true;
-  state.seatOfferRemaining = stationSegment.remaining;
+  state.seatOfferRemaining = Math.min(getSeatOfferDuration(), stationSegment.remaining);
   state.seatProgress = 0;
   state.lastActionKey = "none:false";
   showStatusText(`Seat available at ${stationSegment.current.name}!`, "success");
@@ -1184,7 +1193,7 @@ function updateStationSeatOffer(elapsed, stationSegment) {
     return;
   }
 
-  state.seatOfferRemaining = stationSegment.remaining;
+  state.seatOfferRemaining = Math.max(0, state.seatOfferRemaining - elapsed);
   state.seatProgress = clamp(
     state.seatProgress - SEAT_RUSH_CONFIG.decayPerSecond * (elapsed / 1000),
     0,
@@ -1589,6 +1598,7 @@ function populateSettingsForm() {
   );
   setSettingInputValue("seatRush.seatThreshold", ratioToPercent(SEAT_RUSH_CONFIG.seatThreshold));
   setSettingInputValue("seatOffer.chance", ratioToPercent(getSeatOfferChance()));
+  setSettingInputValue("seatOffer.duration", msToSeconds(getSeatOfferDuration()));
   setSettingInputValue("upright.betaMin", UPRIGHT.betaMin);
   setSettingInputValue("upright.betaMax", UPRIGHT.betaMax);
   setSettingInputValue("upright.gammaMax", UPRIGHT.gammaMax);
@@ -1697,6 +1707,9 @@ function readSettingsForm() {
     seatOffer: {
       chance: percentToRatio(
         readSettingNumber("seatOffer.chance", ratioToPercent(getSeatOfferChance())),
+      ),
+      duration: secondsToMs(
+        readSettingNumber("seatOffer.duration", msToSeconds(getSeatOfferDuration())),
       ),
     },
     upright: {
