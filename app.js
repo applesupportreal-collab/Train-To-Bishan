@@ -4,7 +4,7 @@ const DEMO_SKIP_QUERY_VALUE = "true";
 const USER_SETTINGS_STORAGE_KEY = "train-to-bishan:user-settings";
 const RANDOM_TRAIN_SOUND_MIN_GAP = 30_000;
 const MIN_TRAIN_ARRIVAL_DURATION = 10_000;
-const TRAIN_SLIDE_LEAD_TIME = 7_000;
+const TRAIN_SLIDE_LEAD_TIME = 6_000;
 const DEFAULT_GAME_SETTINGS = {
   routeStations: [
     { code: "NS25", name: "City Hall" },
