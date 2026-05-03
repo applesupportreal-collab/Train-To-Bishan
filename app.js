@@ -3970,7 +3970,7 @@ function renderPhaseCopy(paused, upright) {
   if (state.phase === "riding") {
     statusRibbonEl.textContent = getRideStatusText();
     messageEl.textContent = usesUprightCheck
-      ? `Keep the phone upright until ${destination.name}.`
+      ? "Keep the phone upright until a seat is available."
       : "Ride it out standing until a seat becomes available.";
     return;
   }
