@@ -473,6 +473,7 @@ const MAIN_SUBTITLE_HTML =
 const DEMO_SKIP_ENABLED = readDemoSkipEnabled();
 const STATUS_TEXT_DURATION = 3_000;
 const STATUS_TEXT_FADE_DURATION = 420;
+const AUNTIE_APPEAR_DELAY = 2_000;
 let statusTextHideTimer = null;
 let statusTextClearTimer = null;
 let rushShakeTimer = null;
@@ -504,6 +505,8 @@ const state = {
   breakdownStartProgress: 0,
   breakdownTargetElapsed: 0,
   breakdownDestination: null,
+  auntiePending: false,
+  auntiePendingRemaining: 0,
   auntieActive: false,
   auntieSide: "left",
   auntieSleeping: false,
@@ -795,6 +798,8 @@ function getAuntieImageSrc() {
 }
 
 function resetAuntieEvent() {
+  state.auntiePending = false;
+  state.auntiePendingRemaining = 0;
   state.auntieActive = false;
   state.auntieSleeping = false;
   state.auntieDimLevel = 0;
@@ -833,7 +838,12 @@ function startAuntieEvent() {
 }
 
 function maybeStartAuntieEvent(stationSegment) {
-  if (state.phase !== "riding" || !state.seated || state.auntieActive) {
+  if (
+    state.phase !== "riding" ||
+    !state.seated ||
+    state.auntieActive ||
+    state.auntiePending
+  ) {
     return;
   }
 
@@ -850,11 +860,27 @@ function maybeStartAuntieEvent(stationSegment) {
   state.auntieDeparturesChecked.add(key);
 
   if (Math.random() < getAuntieChance()) {
-    startAuntieEvent();
+    state.auntiePending = true;
+    state.auntiePendingRemaining = AUNTIE_APPEAR_DELAY;
   }
 }
 
 function updateAuntieEvent(elapsed) {
+  if (state.auntiePending) {
+    if (state.phase !== "riding" || !state.seated || state.breakdownActive) {
+      resetAuntieEvent();
+      return;
+    }
+
+    state.auntiePendingRemaining -= elapsed;
+
+    if (state.auntiePendingRemaining <= 0) {
+      state.auntiePending = false;
+      state.auntiePendingRemaining = 0;
+      startAuntieEvent();
+    }
+  }
+
   if (!state.auntieActive) {
     return;
   }
