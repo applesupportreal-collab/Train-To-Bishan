@@ -4,9 +4,10 @@ const DEMO_SKIP_QUERY_VALUE = "true";
 const USER_SETTINGS_STORAGE_KEY = "train-to-bishan:user-settings";
 const RANDOM_TRAIN_SOUND_MIN_GAP = 30_000;
 const MIN_TRAIN_ARRIVAL_DURATION = 10_000;
+const MIN_DURATION_BETWEEN_STATIONS = 10_000;
 const TRAIN_SLIDE_LEAD_TIME = 6_000;
 const TUNNEL_NOISE_SRC = "sounds/tunnel_noise.ogg";
-const TUNNEL_NOISE_FADE_DURATION = 2_000;
+const TUNNEL_NOISE_FADE_DURATION = 5_000;
 const PRELOAD_IMAGE_PATHS = [
   "assets/city_hall_platform_doors_open.png",
   "assets/mrt_train_doors_open.png",
@@ -177,11 +178,17 @@ function cloneTimingConfig(config) {
     Number.isFinite(configuredArrivalDuration) && configuredArrivalDuration >= 0
       ? Math.max(MIN_TRAIN_ARRIVAL_DURATION, configuredArrivalDuration)
       : fallbackArrivalDuration;
+  const configuredDurationBetweenStations = Number(timingConfig.durationBetweenStations);
+  const durationBetweenStations =
+    Number.isFinite(configuredDurationBetweenStations) && configuredDurationBetweenStations >= 0
+      ? Math.max(MIN_DURATION_BETWEEN_STATIONS, configuredDurationBetweenStations)
+      : DEFAULT_GAME_SETTINGS.timing.durationBetweenStations;
 
   return {
     ...timingConfig,
     initialTrainArrivalDuration,
     trainArrivalDuration: initialTrainArrivalDuration,
+    durationBetweenStations,
   };
 }
 
@@ -571,8 +578,8 @@ function getStationDurations() {
   return Array.from({ length: legCount }, (_, index) => {
     const fallbackDuration = GAME_CONFIG.durationBetweenStations;
     const configuredDuration = Number(configuredDurations[index] ?? fallbackDuration);
-    return Number.isFinite(configuredDuration) && configuredDuration > 0
-      ? configuredDuration
+    return Number.isFinite(configuredDuration) && configuredDuration >= 0
+      ? Math.max(MIN_DURATION_BETWEEN_STATIONS, configuredDuration)
       : fallbackDuration;
   });
 }
@@ -3282,8 +3289,8 @@ function createTunnelNoisePlayer() {
     stop(immediate = false) {
       clearAudio(audio, immediate);
     },
-    tick(canPlay) {
-      if (canPlay) {
+    tick(canPlay, remaining = Number.POSITIVE_INFINITY) {
+      if (canPlay && remaining > TUNNEL_NOISE_FADE_DURATION) {
         this.start();
         return;
       }
@@ -3294,8 +3301,15 @@ function createTunnelNoisePlayer() {
       this.blocked = false;
       this.unlock();
 
-      if (state.phase === "riding" && getStationSegment().mode === "travel") {
-        this.start();
+      if (state.phase === "riding") {
+        const stationSegment = getStationSegment();
+
+        if (
+          stationSegment.mode === "travel" &&
+          stationSegment.remaining > TUNNEL_NOISE_FADE_DURATION
+        ) {
+          this.start();
+        }
       }
 
       render();
@@ -4029,7 +4043,7 @@ function tick(now) {
   const cabinAudioCanPlay = state.phase === "riding" && !state.breakdownActive;
   const tunnelNoiseCanPlay = cabinAudioCanPlay && currentSegment?.mode === "travel";
   trainSoundscape.tick(now, cabinAudioCanPlay);
-  tunnelNoisePlayer.tick(tunnelNoiseCanPlay);
+  tunnelNoisePlayer.tick(tunnelNoiseCanPlay, currentSegment?.remaining);
   render();
   requestAnimationFrame(tick);
 }
