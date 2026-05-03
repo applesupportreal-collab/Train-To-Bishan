@@ -452,6 +452,7 @@ const actionButtonEl = document.querySelector("#actionButton");
 const successMessageEl = document.querySelector("#successMessage");
 const successRestartButtonEl = document.querySelector("#successRestartButton");
 const sensorFallbackEl = document.querySelector("#sensorFallback");
+const uprightOverlayEl = document.querySelector("#uprightOverlay");
 const routeTitleEl = document.querySelector(".title-lockup h1");
 const routeSubtitleEl = document.querySelector(".title-lockup p");
 const stationSignCodeEl = document.querySelector(".station-sign .line-code");
@@ -3784,6 +3785,7 @@ function render() {
   successScreenEl.hidden = state.showingSettings || state.phase !== "arrived";
   deviceIndicatorEl.hidden = state.showingSettings;
   gameEl.classList.toggle("paused", paused);
+  uprightOverlayEl.hidden = !paused;
   document.body.classList.toggle("arrival-pulse", state.phase === "boarding");
   trainEl.classList.toggle("arrived", state.phase !== "idle" && state.arrivalRemaining <= 0);
   trainEl.classList.toggle("boarding", state.phase === "boarding");

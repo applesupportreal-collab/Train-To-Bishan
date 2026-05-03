@@ -1335,20 +1335,32 @@ button {
   text-decoration: underline;
 }
 
-.game.paused::after {
+.upright-overlay {
   position: absolute;
   inset: 0;
   z-index: 80;
   display: grid;
-  place-items: center;
+  align-content: center;
+  justify-items: center;
+  gap: 18px;
   padding: 24px;
   background: rgba(23, 32, 38, 0.68);
   color: white;
-  content: "Phone is not being held upright!";
   font-size: clamp(1.5rem, 8vw, 3rem);
   font-weight: 900;
   text-align: center;
   pointer-events: none;
+}
+
+.upright-overlay[hidden] {
+  display: none;
+}
+
+.upright-overlay img {
+  width: min(76%, 280px);
+  max-height: 48vh;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.35));
 }
 
 .arrival-pulse .station-sign {
