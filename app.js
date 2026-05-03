@@ -481,6 +481,7 @@ let rushShakeTimer = null;
 let previousBetweenStationsSettingValue = "";
 let activeSettingsPreviewAudio = null;
 let activeSettingsPreviewButton = null;
+let sleepPointerId = null;
 
 const state = {
   phase: "idle",
@@ -934,6 +935,27 @@ function stopPretendSleep() {
 
   state.auntieSleeping = false;
   render();
+}
+
+function endPretendSleepPress(event = null) {
+  if (
+    event?.pointerId !== undefined &&
+    sleepPointerId !== null &&
+    event.pointerId !== sleepPointerId
+  ) {
+    return;
+  }
+
+  if (
+    sleepPointerId !== null &&
+    typeof actionButtonEl.releasePointerCapture === "function" &&
+    actionButtonEl.hasPointerCapture?.(sleepPointerId)
+  ) {
+    actionButtonEl.releasePointerCapture(sleepPointerId);
+  }
+
+  sleepPointerId = null;
+  stopPretendSleep();
 }
 
 function isSleepActionActive() {
@@ -4158,15 +4180,41 @@ actionButtonEl.addEventListener("pointerdown", (event) => {
   }
 
   event.preventDefault();
+  sleepPointerId = event.pointerId;
   startPretendSleep();
 
   if (typeof actionButtonEl.setPointerCapture === "function") {
-    actionButtonEl.setPointerCapture(event.pointerId);
+    actionButtonEl.setPointerCapture(sleepPointerId);
   }
 });
 
-window.addEventListener("pointerup", stopPretendSleep);
-window.addEventListener("pointercancel", stopPretendSleep);
+actionButtonEl.addEventListener("lostpointercapture", endPretendSleepPress);
+
+actionButtonEl.addEventListener("contextmenu", (event) => {
+  if (!state.auntieSleeping && !isSleepActionActive()) {
+    return;
+  }
+
+  event.preventDefault();
+  endPretendSleepPress();
+});
+
+actionButtonEl.addEventListener("selectstart", (event) => {
+  event.preventDefault();
+});
+
+window.addEventListener("pointerup", endPretendSleepPress);
+window.addEventListener("pointercancel", endPretendSleepPress);
+window.addEventListener("touchend", endPretendSleepPress);
+window.addEventListener("touchcancel", endPretendSleepPress);
+window.addEventListener("mouseup", endPretendSleepPress);
+window.addEventListener("blur", endPretendSleepPress);
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    endPretendSleepPress();
+  }
+});
 
 successRestartButtonEl.addEventListener("click", resetState);
 

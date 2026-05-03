@@ -40,6 +40,9 @@ button {
   color: inherit;
   font: inherit;
   touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .app-frame {
@@ -1243,6 +1246,9 @@ button {
   background: var(--green);
   font-size: 1.35rem;
   box-shadow: 0 12px 22px rgba(22, 128, 96, 0.26);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .action-button[data-action="rush"] {
@@ -1290,6 +1296,7 @@ button {
   border-color: #f7f3eb;
   background: linear-gradient(180deg, #1f2933, #0d1116);
   color: #fffaf0;
+  touch-action: none;
   box-shadow:
     0 0 0 4px rgba(23, 32, 38, 0.22),
     0 14px 28px rgba(0, 0, 0, 0.34);
