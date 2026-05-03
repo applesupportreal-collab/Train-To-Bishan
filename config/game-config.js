@@ -74,6 +74,9 @@ window.TRAIN_TO_BISHAN_GAME_CONFIG = {
     duration: 500,
     tickInterval: 50,
   },
+  audio: {
+    masterVolume: 1,
+  },
   startSound: {
     src: "sounds/train_service_ends_at_bishan.ogg",
     volume: 1,

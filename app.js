@@ -52,6 +52,9 @@ const DEFAULT_GAME_SETTINGS = {
     duration: 500,
     tickInterval: 50,
   },
+  audio: {
+    masterVolume: 1,
+  },
   startSound: {
     src: "sounds/train_service_ends_at_bishan.ogg",
     volume: 1,
@@ -133,6 +136,7 @@ let SEAT_OFFER_CONFIG = { ...DEFAULT_GAME_SETTINGS.seatOffer };
 let UPRIGHT = { ...DEFAULT_GAME_SETTINGS.upright };
 let TRAIN_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.trainSound };
 let AUDIO_FADE_CONFIG = { ...DEFAULT_GAME_SETTINGS.audioFade };
+let AUDIO_CONFIG = { ...DEFAULT_GAME_SETTINGS.audio };
 let START_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.startSound };
 let END_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.endSound };
 let AUNTIE_SOUND_CONFIG = { ...DEFAULT_GAME_SETTINGS.auntieSound };
@@ -318,6 +322,10 @@ function applyGameSettings(settings) {
     ...DEFAULT_GAME_SETTINGS.audioFade,
     ...readObject(externalSettings.audioFade),
   };
+  AUDIO_CONFIG = {
+    ...DEFAULT_GAME_SETTINGS.audio,
+    ...readObject(externalSettings.audio),
+  };
   START_SOUND_CONFIG = {
     ...DEFAULT_GAME_SETTINGS.startSound,
     ...readObject(externalSettings.startSound),
@@ -458,6 +466,7 @@ const settingsButtonEl = document.querySelector("#settingsButton");
 const settingsBackButtonEl = document.querySelector("#settingsBackButton");
 const settingsFormEl = document.querySelector("#settingsForm");
 const settingsResetButtonEl = document.querySelector("#settingsResetButton");
+const stationDurationSettingsEl = document.querySelector("#stationDurationSettings");
 const settingsInputEls = Object.fromEntries(
   [...document.querySelectorAll("[data-setting]")].map((input) => [input.dataset.setting, input]),
 );
@@ -469,6 +478,8 @@ const STATUS_TEXT_FADE_DURATION = 420;
 let statusTextHideTimer = null;
 let statusTextClearTimer = null;
 let rushShakeTimer = null;
+let previousBetweenStationsSettingValue = "";
+let activeSettingsPreviewAudio = null;
 
 const state = {
   phase: "idle",
@@ -1262,6 +1273,227 @@ function setSettingInputValue(key, value) {
   }
 }
 
+function getStationDurationInputEls() {
+  return [...document.querySelectorAll("[data-station-duration-index]")];
+}
+
+function renderStationDurationSettings() {
+  if (!stationDurationSettingsEl) {
+    return;
+  }
+
+  stationDurationSettingsEl.textContent = "";
+
+  ROUTE_STATIONS.slice(0, -1).forEach((station, index) => {
+    const nextStation = ROUTE_STATIONS[index + 1];
+    const label = document.createElement("label");
+    const stationLabel = document.createElement("span");
+    const input = document.createElement("input");
+    const unit = document.createElement("small");
+
+    stationLabel.textContent = `${station.name} to ${nextStation.name}`;
+    input.type = "number";
+    input.min = "1";
+    input.step = "0.5";
+    input.required = true;
+    input.dataset.stationDurationIndex = String(index);
+    unit.textContent = "s";
+
+    label.append(stationLabel, input, unit);
+    stationDurationSettingsEl.append(label);
+  });
+}
+
+function setStationDurationInputValues(durations = getStationDurations()) {
+  getStationDurationInputEls().forEach((input) => {
+    const index = Number(input.dataset.stationDurationIndex);
+    const duration = durations[index] ?? GAME_CONFIG.durationBetweenStations;
+    input.value = formatSettingValue(msToSeconds(duration));
+  });
+}
+
+function setAllStationDurationInputValues(seconds) {
+  getStationDurationInputEls().forEach((input) => {
+    input.value = formatSettingValue(seconds);
+  });
+}
+
+function hasCustomStationDurationValues(baseSeconds) {
+  return getStationDurationInputEls().some((input) => {
+    const duration = Number(input.value);
+    return Number.isFinite(duration) && Math.abs(duration - baseSeconds) > 0.001;
+  });
+}
+
+function readStationDurationSettings(globalDuration) {
+  const globalSeconds = msToSeconds(globalDuration);
+  const durations = getStationDurationInputEls().map((input) => {
+    const value = Number(input.value);
+    return secondsToMs(Number.isFinite(value) ? value : globalSeconds);
+  });
+
+  return durations.some((duration) => duration !== globalDuration) ? durations : [];
+}
+
+function getCurrentSettingsMasterVolume() {
+  return percentToRatio(
+    readSettingNumber("audio.masterVolume", ratioToPercent(AUDIO_CONFIG.masterVolume)),
+  );
+}
+
+function getPreviewVolume(key, fallbackVolume) {
+  return clampVolume(
+    percentToRatio(readSettingNumber(key, ratioToPercent(fallbackVolume))) *
+      getCurrentSettingsMasterVolume(),
+  );
+}
+
+function stopSettingsPreviewAudio() {
+  if (!activeSettingsPreviewAudio) {
+    return;
+  }
+
+  disposeAudio(activeSettingsPreviewAudio);
+  activeSettingsPreviewAudio = null;
+}
+
+function getSettingsPreviewSound(previewType) {
+  switch (previewType) {
+    case "random-cabin": {
+      const effects = getTrainSoundEffects();
+      const effect = effects[Math.floor(Math.random() * effects.length)];
+      return effect
+        ? {
+            src: effect.src,
+            volume: getPreviewVolume("trainSound.defaultVolume", effect.volume),
+          }
+        : null;
+    }
+    case "announcement":
+      return {
+        src: getStationAnnouncementSrc(getFirstNextStation(), "next"),
+        volume: getPreviewVolume("announcement.volume", ANNOUNCEMENT_CONFIG.volume),
+      };
+    case "door-closing":
+      return {
+        src: DOOR_CLOSING_SOUND_CONFIG.src,
+        volume: getPreviewVolume(
+          "doorClosingSound.volume",
+          DOOR_CLOSING_SOUND_CONFIG.volume ?? 1,
+        ),
+      };
+    case "intro":
+      return {
+        src: START_SOUND_CONFIG.src,
+        volume: getPreviewVolume("startSound.volume", START_SOUND_CONFIG.volume ?? 1),
+      };
+    case "victory":
+      return {
+        src: END_SOUND_CONFIG.src,
+        volume: getPreviewVolume("endSound.volume", END_SOUND_CONFIG.volume ?? 1),
+      };
+    case "auntie":
+      return {
+        src: AUNTIE_SOUND_CONFIG.src,
+        volume: getPreviewVolume("auntieSound.volume", AUNTIE_SOUND_CONFIG.volume ?? 1),
+      };
+    case "breakdown":
+      return {
+        src: TRAIN_BREAKDOWN_CONFIG.src,
+        volume: getPreviewVolume(
+          "trainBreakdown.volume",
+          TRAIN_BREAKDOWN_CONFIG.volume ?? 1,
+        ),
+      };
+    case "train-delay":
+      return {
+        src: TRAIN_DELAY_CONFIG.src,
+        volume: getPreviewVolume("trainDelay.volume", TRAIN_DELAY_CONFIG.volume ?? 1),
+      };
+    default:
+      return null;
+  }
+}
+
+function playSettingsAudioPreview(previewType) {
+  const preview = getSettingsPreviewSound(previewType);
+  const src = typeof preview?.src === "string" ? preview.src.trim() : "";
+
+  stopSettingsPreviewAudio();
+
+  if (!src) {
+    logSoundDebug("Settings preview skipped; no source configured.", { previewType });
+    return;
+  }
+
+  const audio = new Audio(src);
+  audio.preload = "auto";
+  audio.playsInline = true;
+  audio.volume = clampVolume(preview.volume);
+  activeSettingsPreviewAudio = audio;
+
+  audio.addEventListener(
+    "ended",
+    () => {
+      if (activeSettingsPreviewAudio === audio) {
+        activeSettingsPreviewAudio = null;
+      }
+      disposeAudio(audio);
+    },
+    { once: true },
+  );
+
+  audio.addEventListener(
+    "error",
+    () => {
+      if (activeSettingsPreviewAudio === audio) {
+        activeSettingsPreviewAudio = null;
+      }
+      disposeAudio(audio);
+      logSoundDebug("Settings preview failed to load.", { previewType, src });
+    },
+    { once: true },
+  );
+
+  audio
+    .play()
+    .then(() => {
+      logSoundDebug("Settings preview playback started.", { previewType, src });
+    })
+    .catch((error) => {
+      if (activeSettingsPreviewAudio === audio) {
+        activeSettingsPreviewAudio = null;
+      }
+      disposeAudio(audio);
+      logSoundDebug("Settings preview playback was blocked or failed.", {
+        previewType,
+        src,
+        error,
+      });
+    });
+}
+
+function handleBetweenStationsChange(event) {
+  const input = event.currentTarget;
+  const previousSeconds = Number(previousBetweenStationsSettingValue);
+  const nextSeconds = readSettingNumber(
+    "timing.durationBetweenStations",
+    msToSeconds(GAME_CONFIG.durationBetweenStations),
+  );
+
+  if (
+    Number.isFinite(previousSeconds) &&
+    hasCustomStationDurationValues(previousSeconds) &&
+    !window.confirm("Changing Between stations will reset your custom station timings.")
+  ) {
+    input.value = previousBetweenStationsSettingValue;
+    return;
+  }
+
+  setAllStationDurationInputValues(nextSeconds);
+  previousBetweenStationsSettingValue = formatSettingValue(nextSeconds);
+}
+
 function readSettingNumber(key, fallback) {
   const input = getSettingInput(key);
   const value = Number(input?.value);
@@ -1269,6 +1501,7 @@ function readSettingNumber(key, fallback) {
 }
 
 function populateSettingsForm() {
+  renderStationDurationSettings();
   setSettingInputValue(
     "timing.initialTrainArrivalDuration",
     msToSeconds(GAME_CONFIG.initialTrainArrivalDuration),
@@ -1278,6 +1511,10 @@ function populateSettingsForm() {
     "timing.durationBetweenStations",
     msToSeconds(GAME_CONFIG.durationBetweenStations),
   );
+  previousBetweenStationsSettingValue = formatSettingValue(
+    msToSeconds(GAME_CONFIG.durationBetweenStations),
+  );
+  setStationDurationInputValues();
   setSettingInputValue(
     "timing.stationDwellDuration",
     msToSeconds(GAME_CONFIG.stationDwellDuration),
@@ -1315,6 +1552,7 @@ function populateSettingsForm() {
     "doorClosingSound.leadTime",
     msToSeconds(getDoorClosingLeadTime()),
   );
+  setSettingInputValue("audio.masterVolume", ratioToPercent(AUDIO_CONFIG.masterVolume));
   setSettingInputValue(
     "trainSound.defaultVolume",
     ratioToPercent(TRAIN_SOUND_CONFIG.defaultVolume),
@@ -1346,6 +1584,12 @@ function readSettingsForm() {
     "timing.initialTrainArrivalDuration",
     msToSeconds(GAME_CONFIG.initialTrainArrivalDuration),
   );
+  const durationBetweenStations = secondsToMs(
+    readSettingNumber(
+      "timing.durationBetweenStations",
+      msToSeconds(GAME_CONFIG.durationBetweenStations),
+    ),
+  );
   const betaMin = readSettingNumber("upright.betaMin", UPRIGHT.betaMin);
   const betaMax = readSettingNumber("upright.betaMax", UPRIGHT.betaMax);
   const auntieMinDuration = secondsToMs(
@@ -1368,18 +1612,14 @@ function readSettingsForm() {
       boardingDuration: secondsToMs(
         readSettingNumber("timing.boardingDuration", msToSeconds(GAME_CONFIG.boardingDuration)),
       ),
-      durationBetweenStations: secondsToMs(
-        readSettingNumber(
-          "timing.durationBetweenStations",
-          msToSeconds(GAME_CONFIG.durationBetweenStations),
-        ),
-      ),
+      durationBetweenStations,
       stationDwellDuration: secondsToMs(
         readSettingNumber(
           "timing.stationDwellDuration",
           msToSeconds(GAME_CONFIG.stationDwellDuration),
         ),
       ),
+      stationDurations: readStationDurationSettings(durationBetweenStations),
     },
     seatRush: {
       gainPerPress: percentToRatio(
@@ -1432,6 +1672,11 @@ function readSettingsForm() {
     audioFade: {
       duration: secondsToMs(
         readSettingNumber("audioFade.duration", msToSeconds(getAudioFadeDuration())),
+      ),
+    },
+    audio: {
+      masterVolume: percentToRatio(
+        readSettingNumber("audio.masterVolume", ratioToPercent(AUDIO_CONFIG.masterVolume)),
       ),
     },
     trainSound: {
@@ -1573,11 +1818,19 @@ function showStatusText(message, tone) {
 function clampVolume(volume) {
   const numericVolume = Number(volume);
 
-  if (Number.isNaN(numericVolume)) {
+  if (!Number.isFinite(numericVolume)) {
     return TRAIN_SOUND_CONFIG.defaultVolume;
   }
 
   return Math.min(1, Math.max(0, numericVolume));
+}
+
+function getMasterVolume() {
+  return clampVolume(AUDIO_CONFIG.masterVolume ?? 1);
+}
+
+function getEffectiveVolume(volume) {
+  return clampVolume(volume) * getMasterVolume();
 }
 
 function logSoundDebug(message, detail = undefined) {
@@ -1729,9 +1982,10 @@ function scheduleAudioFadeOut(audio) {
 
 function prepareAudioForPlayback(audio, targetVolume) {
   const clampedTargetVolume = clampVolume(targetVolume);
+  const effectiveTargetVolume = getEffectiveVolume(clampedTargetVolume);
 
   if (audio.muted || getAudioFadeDuration() <= 0) {
-    audio.volume = audio.muted ? 0 : clampedTargetVolume;
+    audio.volume = audio.muted ? 0 : effectiveTargetVolume;
     return clampedTargetVolume;
   }
 
@@ -1740,7 +1994,7 @@ function prepareAudioForPlayback(audio, targetVolume) {
 }
 
 function startAudioFades(audio, targetVolume) {
-  const clampedTargetVolume = clampVolume(targetVolume);
+  const clampedTargetVolume = getEffectiveVolume(targetVolume);
 
   if (audio.muted) {
     audio.volume = 0;
@@ -2301,7 +2555,7 @@ function createDoorClosingSoundPlayer() {
 
   function createAudio(muted = false) {
     const audio = new Audio(getSrc());
-    audio.volume = muted ? 0 : clampVolume(DOOR_CLOSING_SOUND_CONFIG.volume ?? 1);
+    audio.volume = muted ? 0 : getEffectiveVolume(DOOR_CLOSING_SOUND_CONFIG.volume ?? 1);
     audio.muted = muted;
     audio.preload = "auto";
     audio.playsInline = true;
@@ -2460,7 +2714,7 @@ function createStationAnnouncementPlayer() {
 
   function createAudio(station, type, muted = false) {
     const audio = new Audio(getStationAnnouncementSrc(station, type));
-    audio.volume = muted ? 0 : clampVolume(ANNOUNCEMENT_CONFIG.volume);
+    audio.volume = muted ? 0 : getEffectiveVolume(ANNOUNCEMENT_CONFIG.volume);
     audio.muted = muted;
     audio.preload = "auto";
     audio.playsInline = true;
@@ -3077,6 +3331,7 @@ function openSettings() {
 }
 
 function closeSettings() {
+  stopSettingsPreviewAudio();
   state.showingSettings = false;
   render();
 }
@@ -3099,12 +3354,14 @@ function saveSettings(event) {
     return;
   }
 
+  stopSettingsPreviewAudio();
   USER_GAME_SETTINGS = readSettingsForm();
   saveStoredGameSettings(USER_GAME_SETTINGS);
   refreshAfterSettingsChange("Settings saved.");
 }
 
 function resetSettingsToConfig() {
+  stopSettingsPreviewAudio();
   USER_GAME_SETTINGS = {};
   clearStoredGameSettings();
   refreshAfterSettingsChange("Settings reset.");
@@ -3778,6 +4035,20 @@ settingsButtonEl.addEventListener("click", openSettings);
 settingsBackButtonEl.addEventListener("click", closeSettings);
 settingsFormEl.addEventListener("submit", saveSettings);
 settingsResetButtonEl.addEventListener("click", resetSettingsToConfig);
+getSettingInput("timing.durationBetweenStations")?.addEventListener(
+  "change",
+  handleBetweenStationsChange,
+);
+
+settingsFormEl.addEventListener("click", (event) => {
+  const previewButton = event.target.closest("[data-preview-sound]");
+
+  if (!previewButton) {
+    return;
+  }
+
+  playSettingsAudioPreview(previewButton.dataset.previewSound);
+});
 
 actionButtonEl.addEventListener("click", triggerAction);
 

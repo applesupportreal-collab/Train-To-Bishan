@@ -84,6 +84,9 @@
         </header>
 
         <form class="settings-form" id="settingsForm">
+          <p class="settings-note">
+            Settings are saved in this browser using localStorage. They are not stored with cookies.
+          </p>
           <fieldset>
             <legend>Timing</legend>
             <label>
@@ -106,6 +109,15 @@
               <input data-setting="timing.stationDwellDuration" type="number" min="0" step="0.5" required />
               <small>s</small>
             </label>
+            <details class="advanced-settings">
+              <summary>Advanced</summary>
+              <div class="advanced-settings-body">
+                <p>
+                  Customise travel time for each station pair. Changing Between stations will reset these values.
+                </p>
+                <div class="station-duration-settings" id="stationDurationSettings"></div>
+              </div>
+            </details>
           </fieldset>
 
           <fieldset>
@@ -258,12 +270,12 @@
               <small>s</small>
             </label>
             <label>
-              <span>Random sound minimum</span>
+              <span>Random cabin noise minimum</span>
               <input data-setting="trainSound.minDelay" type="number" min="30" step="0.5" required />
               <small>s</small>
             </label>
             <label>
-              <span>Random sound maximum</span>
+              <span>Random cabin noise maximum</span>
               <input data-setting="trainSound.maxDelay" type="number" min="30" step="0.5" required />
               <small>s</small>
             </label>
@@ -278,50 +290,84 @@
               <small>s</small>
             </label>
             <label>
-              <span>Random cabin noise volume</span>
-              <input data-setting="trainSound.defaultVolume" type="number" min="0" max="100" step="1" required />
+              <span>Master volume</span>
+              <input data-setting="audio.masterVolume" type="number" min="0" max="100" step="1" required />
               <small>%</small>
             </label>
             <label>
-              <span>Announcement volume</span>
-              <input data-setting="announcement.volume" type="number" min="0" max="100" step="1" required />
-              <small>%</small>
-            </label>
-            <label>
-              <span>Door closing volume</span>
-              <input data-setting="doorClosingSound.volume" type="number" min="0" max="100" step="1" required />
-              <small>%</small>
-            </label>
-            <label>
-              <span>Intro announcement volume</span>
-              <input data-setting="startSound.volume" type="number" min="0" max="100" step="1" required />
-              <small>%</small>
-            </label>
-            <label>
-              <span>Victory sound volume</span>
-              <input data-setting="endSound.volume" type="number" min="0" max="100" step="1" required />
-              <small>%</small>
-            </label>
-            <label>
-              <span>Auntie voice volume</span>
-              <input data-setting="auntieSound.volume" type="number" min="0" max="100" step="1" required />
-              <small>%</small>
-            </label>
-            <label>
-              <span>Breakdown announcement volume</span>
-              <input data-setting="trainBreakdown.volume" type="number" min="0" max="100" step="1" required />
-              <small>%</small>
-            </label>
-            <label>
-              <span>Train delay announcement volume</span>
-              <input data-setting="trainDelay.volume" type="number" min="0" max="100" step="1" required />
-              <small>%</small>
-            </label>
-            <label>
-              <span>Max random sounds</span>
+              <span>Max random cabin noises</span>
               <input data-setting="trainSound.maxConcurrent" type="number" min="1" step="1" required />
               <small>max</small>
             </label>
+            <details class="advanced-settings">
+              <summary>Advanced</summary>
+              <div class="advanced-settings-body">
+                <div class="audio-preview-row">
+                  <label>
+                    <span>Random cabin noise volume</span>
+                    <input data-setting="trainSound.defaultVolume" type="number" min="0" max="100" step="1" required />
+                    <small>%</small>
+                  </label>
+                  <button class="preview-button material-symbols-rounded" type="button" data-preview-sound="random-cabin" aria-label="Preview random cabin noise">play_arrow</button>
+                </div>
+                <div class="audio-preview-row">
+                  <label>
+                    <span>Announcement volume</span>
+                    <input data-setting="announcement.volume" type="number" min="0" max="100" step="1" required />
+                    <small>%</small>
+                  </label>
+                  <button class="preview-button material-symbols-rounded" type="button" data-preview-sound="announcement" aria-label="Preview announcement">play_arrow</button>
+                </div>
+                <div class="audio-preview-row">
+                  <label>
+                    <span>Door closing volume</span>
+                    <input data-setting="doorClosingSound.volume" type="number" min="0" max="100" step="1" required />
+                    <small>%</small>
+                  </label>
+                  <button class="preview-button material-symbols-rounded" type="button" data-preview-sound="door-closing" aria-label="Preview door closing sound">play_arrow</button>
+                </div>
+                <div class="audio-preview-row">
+                  <label>
+                    <span>Intro announcement volume</span>
+                    <input data-setting="startSound.volume" type="number" min="0" max="100" step="1" required />
+                    <small>%</small>
+                  </label>
+                  <button class="preview-button material-symbols-rounded" type="button" data-preview-sound="intro" aria-label="Preview intro announcement">play_arrow</button>
+                </div>
+                <div class="audio-preview-row">
+                  <label>
+                    <span>Victory sound volume</span>
+                    <input data-setting="endSound.volume" type="number" min="0" max="100" step="1" required />
+                    <small>%</small>
+                  </label>
+                  <button class="preview-button material-symbols-rounded" type="button" data-preview-sound="victory" aria-label="Preview victory sound">play_arrow</button>
+                </div>
+                <div class="audio-preview-row">
+                  <label>
+                    <span>Auntie voice volume</span>
+                    <input data-setting="auntieSound.volume" type="number" min="0" max="100" step="1" required />
+                    <small>%</small>
+                  </label>
+                  <button class="preview-button material-symbols-rounded" type="button" data-preview-sound="auntie" aria-label="Preview auntie voice">play_arrow</button>
+                </div>
+                <div class="audio-preview-row">
+                  <label>
+                    <span>Breakdown announcement volume</span>
+                    <input data-setting="trainBreakdown.volume" type="number" min="0" max="100" step="1" required />
+                    <small>%</small>
+                  </label>
+                  <button class="preview-button material-symbols-rounded" type="button" data-preview-sound="breakdown" aria-label="Preview breakdown announcement">play_arrow</button>
+                </div>
+                <div class="audio-preview-row">
+                  <label>
+                    <span>Train delay announcement volume</span>
+                    <input data-setting="trainDelay.volume" type="number" min="0" max="100" step="1" required />
+                    <small>%</small>
+                  </label>
+                  <button class="preview-button material-symbols-rounded" type="button" data-preview-sound="train-delay" aria-label="Preview train delay announcement">play_arrow</button>
+                </div>
+              </div>
+            </details>
           </fieldset>
         </form>
 

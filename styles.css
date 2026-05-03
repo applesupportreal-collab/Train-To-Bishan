@@ -243,6 +243,18 @@ button {
   background: #ffffff;
 }
 
+.settings-note {
+  margin: 0;
+  padding: 12px 14px;
+  border: 2px solid rgba(38, 49, 58, 0.12);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #33404a;
+  font-size: 0.88rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
 .settings-form legend {
   padding: 0 4px;
   color: var(--muted);
@@ -278,6 +290,65 @@ button {
   font-size: 0.76rem;
   font-weight: 850;
   text-transform: uppercase;
+}
+
+.advanced-settings {
+  display: grid;
+  gap: 10px;
+}
+
+.advanced-settings summary {
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 2px solid rgba(38, 49, 58, 0.12);
+  border-radius: 8px;
+  background: transparent;
+  color: #26313a;
+  font-weight: 850;
+  list-style-position: inside;
+  cursor: pointer;
+}
+
+.advanced-settings-body {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.advanced-settings-body p {
+  margin: 0;
+  color: #33404a;
+  font-size: 0.84rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.station-duration-settings,
+.audio-preview-row {
+  display: grid;
+  gap: 10px;
+}
+
+.audio-preview-row {
+  grid-template-columns: minmax(0, 1fr) 44px;
+  align-items: center;
+}
+
+.audio-preview-row label {
+  min-width: 0;
+}
+
+.preview-button {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 2px solid rgba(38, 49, 58, 0.14);
+  border-radius: 999px;
+  background: #fff9ea;
+  color: #26313a;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+  font-size: 1.35rem;
 }
 
 .upright-visual {
