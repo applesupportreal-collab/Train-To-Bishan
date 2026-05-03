@@ -465,6 +465,8 @@ const settingsButtonEl = document.querySelector("#settingsButton");
 const settingsBackButtonEl = document.querySelector("#settingsBackButton");
 const settingsFormEl = document.querySelector("#settingsForm");
 const settingsResetButtonEl = document.querySelector("#settingsResetButton");
+const uprightTestButtonEl = document.querySelector("#uprightTestButton");
+const uprightTestStatusEl = document.querySelector("#uprightTestStatus");
 const stationDurationSettingsEl = document.querySelector("#stationDurationSettings");
 const settingsInputEls = Object.fromEntries(
   [...document.querySelectorAll("[data-setting]")].map((input) => [input.dataset.setting, input]),
@@ -482,6 +484,8 @@ let previousBetweenStationsSettingValue = "";
 let activeSettingsPreviewAudio = null;
 let activeSettingsPreviewButton = null;
 let sleepPointerId = null;
+let uprightTestActive = false;
+let uprightTestTimer = null;
 
 const state = {
   phase: "idle",
@@ -3218,6 +3222,83 @@ function isPhoneUpright(now = performance.now()) {
   return state.uprightCheck.upright;
 }
 
+function isUprightForTester(now = performance.now()) {
+  if (!shouldCheckUpright()) {
+    return true;
+  }
+
+  if (!canUseRealMotion()) {
+    return false;
+  }
+
+  const staleAfter = readSettingNumber("upright.staleAfter", UPRIGHT.staleAfter);
+
+  if (
+    state.orientation.beta === null ||
+    state.orientation.gamma === null ||
+    now - state.orientation.seenAt >= staleAfter
+  ) {
+    return false;
+  }
+
+  const betaMin = readSettingNumber("upright.betaMin", UPRIGHT.betaMin);
+  const betaMax = readSettingNumber("upright.betaMax", UPRIGHT.betaMax);
+  const gammaMax = readSettingNumber("upright.gammaMax", UPRIGHT.gammaMax);
+  const beta = Math.abs(state.orientation.beta);
+  const gamma = Math.abs(state.orientation.gamma);
+  return (
+    beta >= Math.min(betaMin, betaMax) &&
+    beta <= Math.max(betaMin, betaMax) &&
+    gamma <= gammaMax
+  );
+}
+
+function setUprightTesterStatus(message, isUpright = null) {
+  uprightTestStatusEl.hidden = false;
+  uprightTestStatusEl.textContent = message;
+  uprightTestStatusEl.classList.toggle("not-upright", isUpright === false);
+}
+
+function stopUprightTester() {
+  uprightTestActive = false;
+  window.clearTimeout(uprightTestTimer);
+  uprightTestTimer = null;
+  uprightTestButtonEl.textContent = "Test upright detection";
+  uprightTestStatusEl.hidden = true;
+  uprightTestStatusEl.classList.remove("not-upright");
+}
+
+function updateUprightTester() {
+  if (!uprightTestActive) {
+    return;
+  }
+
+  const upright = isUprightForTester();
+  setUprightTesterStatus(upright ? "Upright" : "Not Upright", upright);
+  const interval = readSettingNumber("upright.checkInterval", getUprightCheckInterval());
+  uprightTestTimer = window.setTimeout(updateUprightTester, Math.max(100, interval));
+}
+
+async function startUprightTester() {
+  uprightTestActive = true;
+  uprightTestButtonEl.textContent = "Stop upright test";
+  setUprightTesterStatus("Checking...");
+  await requestMotionAccess();
+
+  if (uprightTestActive) {
+    updateUprightTester();
+  }
+}
+
+function toggleUprightTester() {
+  if (uprightTestActive) {
+    stopUprightTester();
+    return;
+  }
+
+  startUprightTester();
+}
+
 function phaseNeedsUpright() {
   if (!shouldCheckUpright()) {
     return false;
@@ -3453,6 +3534,7 @@ function openSettings() {
 
 function closeSettings() {
   stopSettingsPreviewAudio();
+  stopUprightTester();
   state.showingSettings = false;
   render();
 }
@@ -4157,6 +4239,7 @@ settingsButtonEl.addEventListener("click", openSettings);
 settingsBackButtonEl.addEventListener("click", closeSettings);
 settingsFormEl.addEventListener("submit", saveSettings);
 settingsResetButtonEl.addEventListener("click", resetSettingsToConfig);
+uprightTestButtonEl.addEventListener("click", toggleUprightTester);
 getSettingInput("timing.durationBetweenStations")?.addEventListener(
   "change",
   handleBetweenStationsChange,

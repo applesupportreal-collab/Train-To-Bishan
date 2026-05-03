@@ -396,6 +396,29 @@ button {
   object-fit: contain;
 }
 
+.upright-tester {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.upright-test-status {
+  min-width: 96px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: rgba(22, 128, 96, 0.14);
+  color: #116c50;
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.upright-test-status.not-upright {
+  background: rgba(207, 36, 52, 0.14);
+  color: #a31826;
+}
+
 .settings-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
