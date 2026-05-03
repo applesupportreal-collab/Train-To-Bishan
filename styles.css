@@ -721,19 +721,27 @@ button {
   isolation: isolate;
   min-height: 0;
   overflow: hidden;
-  background:
-    linear-gradient(180deg, rgba(23, 32, 38, 0.04), rgba(23, 32, 38, 0.2)),
-    url("assets/city_hall_platform.png");
-  background-position: center;
-  background-size: cover;
+  background: linear-gradient(180deg, rgba(255, 250, 240, 0.08), rgba(23, 32, 38, 0.16));
 }
 
 .scene::before {
   position: absolute;
   inset: 0;
-  z-index: -1;
+  z-index: 0;
   background: linear-gradient(180deg, rgba(255, 250, 240, 0.04), rgba(23, 32, 38, 0.18));
   content: "";
+  pointer-events: none;
+}
+
+.scene::after {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background-image: url("assets/city_hall_platform.png");
+  background-position: center;
+  background-size: cover;
+  content: "";
+  pointer-events: none;
 }
 
 .station-sign {
@@ -877,17 +885,23 @@ button {
 
 .train {
   position: absolute;
-  right: 50%;
-  bottom: 31%;
-  display: none;
-  width: min(620px, 148vw);
-  height: 142px;
-  transform: translateX(-125%);
-  transition: transform 900ms cubic-bezier(0.22, 0.9, 0.25, 1);
+  inset: 0;
+  z-index: 1;
+  background-image: url("assets/mrt_train.png");
+  background-position: center;
+  background-size: cover;
+  transform: translateX(-105%);
+  transition: transform 3300ms cubic-bezier(0.22, 0.9, 0.25, 1);
+  will-change: transform;
 }
 
+.train.approaching,
 .train.arrived {
-  transform: translateX(50%);
+  transform: translateX(0);
+}
+
+.train > * {
+  display: none;
 }
 
 .train.boarding .door.left {

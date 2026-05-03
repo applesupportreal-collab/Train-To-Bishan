@@ -3,6 +3,8 @@ const SCRIPT_CONFIG_GLOBAL = "TRAIN_TO_BISHAN_GAME_CONFIG";
 const DEMO_SKIP_QUERY_VALUE = "true";
 const USER_SETTINGS_STORAGE_KEY = "train-to-bishan:user-settings";
 const RANDOM_TRAIN_SOUND_MIN_GAP = 30_000;
+const MIN_TRAIN_ARRIVAL_DURATION = 10_000;
+const TRAIN_SLIDE_LEAD_TIME = 7_000;
 const DEFAULT_GAME_SETTINGS = {
   routeStations: [
     { code: "NS25", name: "City Hall" },
@@ -167,7 +169,7 @@ function cloneTimingConfig(config) {
   const fallbackArrivalDuration = DEFAULT_GAME_SETTINGS.timing.initialTrainArrivalDuration;
   const initialTrainArrivalDuration =
     Number.isFinite(configuredArrivalDuration) && configuredArrivalDuration >= 0
-      ? configuredArrivalDuration
+      ? Math.max(MIN_TRAIN_ARRIVAL_DURATION, configuredArrivalDuration)
       : fallbackArrivalDuration;
 
   return {
@@ -3891,6 +3893,10 @@ function render() {
   gameEl.classList.toggle("paused", paused);
   uprightOverlayEl.hidden = !paused;
   document.body.classList.toggle("arrival-pulse", state.phase === "boarding");
+  trainEl.classList.toggle(
+    "approaching",
+    state.phase === "waiting" && state.arrivalRemaining <= TRAIN_SLIDE_LEAD_TIME,
+  );
   trainEl.classList.toggle("arrived", state.phase !== "idle" && state.arrivalRemaining <= 0);
   trainEl.classList.toggle("boarding", state.phase === "boarding");
   queueEl.classList.toggle("hidden", state.phase === "riding" || state.phase === "arrived");
