@@ -41,7 +41,7 @@ window.TRAIN_TO_BISHAN_GAME_CONFIG = {
     initialTrainArrivalDuration: 10000,
     trainArrivalDuration: 15000,
     boardingDuration: 8000,
-    durationBetweenStations: 20000,
+    durationBetweenStations: 30000,
     stationDwellDuration: 10000,
     stationDurations: [],
   },

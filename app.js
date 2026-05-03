@@ -19,7 +19,7 @@ const DEFAULT_GAME_SETTINGS = {
     initialTrainArrivalDuration: 15_000,
     trainArrivalDuration: 15_000,
     boardingDuration: 8_000,
-    durationBetweenStations: 12_000,
+    durationBetweenStations: 30_000,
     stationDwellDuration: 20_000,
     stationDurations: [],
   },
