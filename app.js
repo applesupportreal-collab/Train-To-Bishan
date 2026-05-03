@@ -5,6 +5,8 @@ const USER_SETTINGS_STORAGE_KEY = "train-to-bishan:user-settings";
 const RANDOM_TRAIN_SOUND_MIN_GAP = 30_000;
 const MIN_TRAIN_ARRIVAL_DURATION = 10_000;
 const TRAIN_SLIDE_LEAD_TIME = 6_000;
+const TUNNEL_NOISE_SRC = "sounds/tunnel_noise.ogg";
+const TUNNEL_NOISE_FADE_DURATION = 2_000;
 const PRELOAD_IMAGE_PATHS = [
   "assets/city_hall_platform_doors_open.png",
   "assets/mrt_train_doors_open.png",
@@ -1097,6 +1099,7 @@ function startTrainBreakdown(stationSegment) {
   state.stepMotionPeakActive = false;
   state.lastActionKey = "none:false";
   trainSoundscape.stop();
+  tunnelNoisePlayer.stop();
   playTrainBreakdownSound();
   vibrate(VIBRATION_CONFIG.standing);
   showStatusText(`Train broke down! Walk to ${stationSegment.next.name}.`, "danger");
@@ -2170,6 +2173,17 @@ function stopAudioWithFade(audio, onStopped) {
   fadeAudioVolume(audio, 0, getAudioFadeDuration(), onStopped);
 }
 
+function stopAudioWithFixedFade(audio, duration, onStopped) {
+  clearAudioFadeOutTimer(audio);
+
+  if (audio.muted || audio.paused || audio.ended || duration <= 0) {
+    onStopped?.();
+    return;
+  }
+
+  fadeAudioVolume(audio, 0, duration, onStopped);
+}
+
 function getTrainSoundEffects() {
   const configuredEffects = Array.isArray(window.TRAIN_SOUND_EFFECTS)
     ? window.TRAIN_SOUND_EFFECTS
@@ -3161,7 +3175,136 @@ function createTrainSoundscape() {
   };
 }
 
+function createTunnelNoisePlayer() {
+  let audio = null;
+  let stoppingAudio = null;
+
+  function clearAudio(targetAudio, immediate = false) {
+    if (!targetAudio) {
+      return;
+    }
+
+    if (targetAudio === audio) {
+      audio = null;
+    }
+
+    if (targetAudio === stoppingAudio) {
+      stoppingAudio = null;
+    }
+
+    if (immediate) {
+      disposeAudio(targetAudio);
+      return;
+    }
+
+    stoppingAudio = targetAudio;
+    stopAudioWithFixedFade(targetAudio, TUNNEL_NOISE_FADE_DURATION, () => {
+      if (stoppingAudio === targetAudio) {
+        stoppingAudio = null;
+      }
+
+      disposeAudio(targetAudio);
+    });
+  }
+
+  function createAudio(muted = false) {
+    const nextAudio = new Audio(TUNNEL_NOISE_SRC);
+    nextAudio.loop = true;
+    nextAudio.muted = muted;
+    nextAudio.preload = "auto";
+    nextAudio.playsInline = true;
+    nextAudio.volume = muted ? 0 : getEffectiveVolume(TRAIN_SOUND_CONFIG.defaultVolume);
+    return nextAudio;
+  }
+
+  return {
+    blocked: false,
+    unlock() {
+      const primer = createAudio(true);
+      const playAttempt = primer.play();
+
+      if (playAttempt) {
+        playAttempt
+          .then(() => {
+            primer.pause();
+            primer.currentTime = 0;
+            disposeAudio(primer);
+            logSoundDebug("Tunnel noise audio unlocked.", { src: TUNNEL_NOISE_SRC });
+          })
+          .catch((error) => {
+            disposeAudio(primer);
+            logSoundDebug("Tunnel noise unlock failed.", {
+              src: TUNNEL_NOISE_SRC,
+              error: error?.message ?? String(error),
+            });
+          });
+      }
+    },
+    start() {
+      if (audio) {
+        return;
+      }
+
+      if (stoppingAudio) {
+        clearAudio(stoppingAudio, true);
+      }
+
+      const nextAudio = createAudio();
+      const targetVolume = clampVolume(TRAIN_SOUND_CONFIG.defaultVolume);
+      nextAudio.volume = 0;
+      audio = nextAudio;
+      logSoundDebug("Playing tunnel noise.", { src: TUNNEL_NOISE_SRC });
+
+      const playAttempt = nextAudio.play();
+
+      if (playAttempt) {
+        playAttempt
+          .then(() => {
+            fadeAudioVolume(
+              nextAudio,
+              getEffectiveVolume(targetVolume),
+              TUNNEL_NOISE_FADE_DURATION,
+            );
+            this.blocked = false;
+            logSoundDebug("Tunnel noise playback started.", { src: TUNNEL_NOISE_SRC });
+          })
+          .catch((error) => {
+            this.blocked = true;
+            clearAudio(nextAudio, true);
+            logSoundDebug("Tunnel noise blocked or failed.", {
+              src: TUNNEL_NOISE_SRC,
+              error: error?.message ?? String(error),
+            });
+            render();
+          });
+      }
+    },
+    stop(immediate = false) {
+      clearAudio(audio, immediate);
+    },
+    tick(canPlay) {
+      if (canPlay) {
+        this.start();
+        return;
+      }
+
+      this.stop();
+    },
+    enableFromGesture() {
+      this.blocked = false;
+      this.unlock();
+
+      if (state.phase === "riding" && getStationSegment().mode === "travel") {
+        this.start();
+      }
+
+      render();
+    },
+  };
+}
+
 const trainSoundscape = createTrainSoundscape();
+const tunnelNoisePlayer = createTunnelNoisePlayer();
 const stationAnnouncementPlayer = createStationAnnouncementPlayer();
 const doorClosingPlayer = createDoorClosingSoundPlayer();
 const startScreenEl = document.querySelector("#startScreen");
@@ -3451,6 +3594,7 @@ function stopAllAudio(immediate = false) {
   clearTrainBreakdownSound(immediate);
   clearTrainDelaySound(immediate);
   trainSoundscape.stop(immediate);
+  tunnelNoisePlayer.stop(immediate);
   stationAnnouncementPlayer.stop(immediate);
   doorClosingPlayer.stop(immediate);
 }
@@ -3593,6 +3737,7 @@ function resetState() {
   clearTrainBreakdownSound();
   clearTrainDelaySound();
   trainSoundscape.stop();
+  tunnelNoisePlayer.stop();
   stationAnnouncementPlayer.stop();
   doorClosingPlayer.stop();
   state.phase = "idle";
@@ -3626,6 +3771,7 @@ function startWaiting() {
   clearTrainBreakdownSound();
   clearTrainDelaySound();
   trainSoundscape.stop();
+  tunnelNoisePlayer.stop();
   stationAnnouncementPlayer.stop();
   doorClosingPlayer.stop();
   state.phase = "waiting";
@@ -3699,6 +3845,7 @@ function finishRide() {
   clearTrainBreakdownSound();
   clearTrainDelaySound();
   trainSoundscape.stop();
+  tunnelNoisePlayer.stop();
   state.phase = "arrived";
   state.rideRemaining = 0;
   vibrate(VIBRATION_CONFIG.arrival);
@@ -3878,8 +4025,11 @@ function tick(now) {
     }
   }
 
+  const currentSegment = state.phase === "riding" ? getStationSegment() : null;
   const cabinAudioCanPlay = state.phase === "riding" && !state.breakdownActive;
+  const tunnelNoiseCanPlay = cabinAudioCanPlay && currentSegment?.mode === "travel";
   trainSoundscape.tick(now, cabinAudioCanPlay);
+  tunnelNoisePlayer.tick(tunnelNoiseCanPlay);
   render();
   requestAnimationFrame(tick);
 }
@@ -4148,7 +4298,8 @@ function getActionState(now = performance.now()) {
     state.phase === "riding" &&
     (stationAnnouncementPlayer.blocked ||
       doorClosingPlayer.blocked ||
-      (trainSoundscape.blocked && trainSoundscape.hasSounds()))
+      (trainSoundscape.blocked && trainSoundscape.hasSounds()) ||
+      tunnelNoisePlayer.blocked)
   ) {
     return {
       enabled: true,
@@ -4217,6 +4368,7 @@ function triggerAction() {
     stationAnnouncementPlayer.enableFromGesture();
     doorClosingPlayer.enableFromGesture();
     trainSoundscape.enableFromGesture();
+    tunnelNoisePlayer.enableFromGesture();
   } else if (action.type === "reset") {
     resetState();
   }
@@ -4251,6 +4403,7 @@ startButtonEl.addEventListener("click", async () => {
   stationAnnouncementPlayer.unlock();
   doorClosingPlayer.unlock();
   trainSoundscape.unlock();
+  tunnelNoisePlayer.unlock();
   await Promise.all([requestMotionAccess(), requestStepMotionAccess()]);
   startWaiting();
 });
