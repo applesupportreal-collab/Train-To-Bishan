@@ -5,6 +5,10 @@ const USER_SETTINGS_STORAGE_KEY = "train-to-bishan:user-settings";
 const RANDOM_TRAIN_SOUND_MIN_GAP = 30_000;
 const MIN_TRAIN_ARRIVAL_DURATION = 10_000;
 const TRAIN_SLIDE_LEAD_TIME = 6_000;
+const PRELOAD_IMAGE_PATHS = [
+  "assets/city_hall_platform_doors_open.png",
+  "assets/mrt_train_doors_open.png",
+];
 const DEFAULT_GAME_SETTINGS = {
   routeStations: [
     { code: "NS25", name: "City Hall" },
@@ -37,7 +41,7 @@ const DEFAULT_GAME_SETTINGS = {
   upright: {
     betaMin: 48,
     betaMax: 132,
-    gammaMax: 42,
+    gammaMax: 50,
     staleAfter: 1600,
     checkInterval: 300,
   },
@@ -377,6 +381,14 @@ function loadStoredGameSettings() {
     console.warn("Could not load saved Train to Bishan settings.", error);
     return {};
   }
+}
+
+function preloadImages(paths) {
+  paths.forEach((path) => {
+    const image = new Image();
+    image.decoding = "async";
+    image.src = path;
+  });
 }
 
 function saveStoredGameSettings(settings) {
@@ -4347,6 +4359,7 @@ window.addEventListener("keyup", (event) => {
 });
 
 async function initializeGame() {
+  preloadImages(PRELOAD_IMAGE_PATHS);
   await loadGameSettings();
   resetCountdowns();
   render();

@@ -57,7 +57,7 @@ window.TRAIN_TO_BISHAN_GAME_CONFIG = {
   upright: {
     betaMin: 48,
     betaMax: 132,
-    gammaMax: 42,
+    gammaMax: 50,
     staleAfter: 1600,
     checkInterval: 300,
   },
