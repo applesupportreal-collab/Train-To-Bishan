@@ -1,6 +1,6 @@
 # License
 
-Required Notice: Copyright (c) 2026 Train to Bishan contributors.
+Required Notice: Copyright (c) 2026 Brayden Scott Chen, Jun Jie Yam, Jun Sheng Lim, and Xiang Zhi Hor.
 
 ## Source Code
 
